@@ -2409,6 +2409,63 @@ app.post('/api/image/generate', async (req, res) => {
   }
 });
 
+// ── 胜算云的多媒体模型目录（出图/出视频/出音频的模型不在 /v1/models 里）──────────────
+// 这是一条**必须单独走**的路：胜算云的 GET /api/v1/models 只收录 chat 模型
+// （2026-09-08 实拉 204 条，`architecture.output` 全是 text），出图/出视频/出音频模型
+// 一个都没有。后果不是"少几个选项"，而是**用户按提示去点「获取模型列表」，翻遍全表
+// 也挑不出一个图片模型**，只能从文本模型里蒙一个（实测蒙中 ali/qwen3-max 后必然 429）。
+//
+// 另一半的坑在 architecture 字段：`input` 里的 `text+image+video` 是**能读**不是**能生成**，
+// 拿它当能力判据会得出"这家支持出视频"的错结论——显示支持、一选没模型，正是这个来的。
+//
+// 目录在另一台主机上（api.shengsuanyun.com，与 router 不是一个），**免鉴权**：
+//   GET /modelrouter/outputmodalities                → text / image / video / audio
+//   GET /modelrouter/modalities/list?output_names=X  → 该模态的模型（只给 id，没有 api_name）
+//   GET /modelrouter/modalities/info?model_id=<id>   → api_name + class_names + input_schema
+// **api_name 只能逐条问**（试过 /v1/models 带模态参数、modelusage、companies，都拿不到批量），
+// 所以整份目录拉一次缓存住，别每次点按钮打上百个请求。
+// 主机可用 AO_SSY_CATALOG_HOST 覆盖：一是测试要能不联网，二是这个域名是从前端 bundle 里
+// 挖出来的、不在任何公开文档里，哪天它变了得有个不改代码的逃生口。
+const SSY_CATALOG_HOST = (process.env.AO_SSY_CATALOG_HOST || 'https://api.shengsuanyun.com').replace(/\/+$/, '');
+const SSY_CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
+let ssyCatalogCache = { at: 0, models: [], vendors: {} };
+
+async function shengsuanyunMediaModels() {
+  if (ssyCatalogCache.models.length && Date.now() - ssyCatalogCache.at < SSY_CATALOG_TTL_MS) {
+    return ssyCatalogCache;
+  }
+  const ua = { 'user-agent': `agency-orchestrator/${PKG_VERSION}` };
+  const getJson = async (url, ms = 15000) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const r = await fetch(url, { headers: ua, signal: ctrl.signal });
+      return r.ok ? await r.json() : null;
+    } catch { return null; } finally { clearTimeout(timer); }
+  };
+  const models = [];
+  const vendors = {};
+  for (const modality of ['image', 'video', 'audio']) {
+    const listed = await getJson(`${SSY_CATALOG_HOST}/modelrouter/modalities/list?page=1&page_size=100&output_names=${modality}`);
+    const infos = listed?.data?.infos;
+    if (!Array.isArray(infos) || !infos.length) continue;
+    // 并发问详情，但压住并发数——这是别人家的公开接口，不该被我们打成 DDoS
+    const ids = infos.map((x) => x?.id).filter((x) => Number.isFinite(x));
+    for (let i = 0; i < ids.length; i += 6) {
+      const batch = await Promise.all(ids.slice(i, i + 6).map((id) => getJson(`${SSY_CATALOG_HOST}/modelrouter/modalities/info?model_id=${id}`)));
+      for (const d of batch) {
+        const info = d?.data;
+        if (!info || typeof info.api_name !== 'string' || !info.api_name) continue;
+        models.push(info.api_name);
+        if (typeof info.company_name === 'string' && info.company_name.trim()) vendors[info.api_name] = info.company_name.trim();
+      }
+    }
+  }
+  // 一条都没拉到就不覆盖旧缓存：目录站临时抽风时，宁可给上次的结果，也别把下拉清空
+  if (models.length) ssyCatalogCache = { at: Date.now(), models: [...new Set(models)].sort(), vendors };
+  return ssyCatalogCache;
+}
+
 // ── 拉取供应商的真实可用模型列表（OpenAI 兼容 GET /models；claude 走 Anthropic 原生端点）──
 // body 可带 baseUrl/apiKey 覆盖：add-custom 场景用户刚填了还没保存也能先拉列表。
 app.post('/api/provider-models', async (req, res) => {
@@ -2515,6 +2572,16 @@ app.post('/api/provider-models', async (req, res) => {
           const owner = typeof m.owned_by === 'string' && m.owned_by.trim() ? m.owned_by.trim()
             : typeof m.provider === 'string' && m.provider.trim() ? m.provider.trim() : '';
           if (owner && !PLACEHOLDER_OWNER.test(owner)) vendors[m.id] = owner;
+        }
+        // 胜算云：把多媒体模型并进来（它们不在 /v1/models 里，见 shengsuanyunMediaModels 的说明）。
+        // 目录拉失败就当没有——多媒体模型少几个，总好过整个列表拿不到。
+        if (provider === 'shengsuanyun' || /router\.shengsuanyun\.com/i.test(base)) {
+          const media = await shengsuanyunMediaModels().catch(() => null);
+          if (media?.models?.length) {
+            for (const id of media.models) if (!models.includes(id)) models.push(id);
+            models.sort();
+            Object.assign(vendors, media.vendors);
+          }
         }
         if (models.length) return res.json({ ok: true, models, ...(Object.keys(vendors).length ? { vendors } : {}) });
         lastErr = 'empty model list';
