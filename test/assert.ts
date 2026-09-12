@@ -5,7 +5,7 @@
  * 剩下 5 个格式完好,模型验收员说"满足标准",编译也过——整节内容带着绿灯没了。
  * 所以本测试的第一条就是复现那个形态,并确认它**这次会被拦下**。
  */
-import { checkAssert, buildAssertReworkBlock } from '../src/core/assert.js';
+import { checkAssert, buildAssertReworkBlock, countChars, resolveAssert } from '../src/core/assert.js';
 import { parseWorkflow, validateWorkflow } from '../src/core/parser.js';
 import { resolve } from 'node:path';
 import { writeFileSync, mkdtempSync } from 'node:fs';
@@ -185,6 +185,69 @@ test('解析期：空 assert 要报错（空断言永远通过，等于没写）
 test('解析期：emits_files 写成字符串要报错', () => {
   const errs = assertErrors(BASE('    assert:\n      emits_files: "6"\n'));
   assert(errs.some((e) => e.includes('非负整数')), `应报类型错，实得：${errs.join('; ')}`);
+});
+
+// ── min_chars / max_chars：写作类模板的"字数"，按非空白字符数，可引用输入变量
+test('countChars: 非空白字符按码点计，中文一字一计，空格换行不算', () => {
+  assert(countChars('你好，世界') === 5, `"你好，世界" 应为 5，实际 ${countChars('你好，世界')}`);
+  assert(countChars('  a b\n\nc ') === 3, '空白不计');
+  assert(countChars('😀😀') === 2, 'emoji 按码点各算一个，不是 4');
+});
+
+test('min_chars: 数字写法，写短了 → 拦下，报的是"字"不是字节', () => {
+  const r = checkAssert('一二三四五', { min_chars: 6 });
+  assert(!r.pass && r.failures[0].includes('至少 6 字') && r.failures[0].includes('实际 5 字'), r.failures.join('; '));
+});
+
+test('max_chars: 超长 → 拦下；区间内通过', () => {
+  assert(!checkAssert('一二三四五', { max_chars: 4 }).pass, '5 字超过上限 4 应拦下');
+  assert(checkAssert('一二三四五', { min_chars: 5, max_chars: 5 }).pass, '恰好等于上下限通过');
+});
+
+test('resolveAssert: "{{length}} * 0.7" 按本次输入算成数字', () => {
+  const ctx = new Map([['length', '3000']]);
+  const r = resolveAssert({ min_chars: '{{length}} * 0.7', max_chars: '{{length}}*1.3', min_bytes: 10 }, ctx);
+  assert(r.min_chars === 2100 && r.max_chars === 3900, `应为 2100 / 3900，实际 ${r.min_chars} / ${r.max_chars}`);
+  assert(r.min_bytes === 10, '其它字段原样');
+});
+
+test('resolveAssert: 变量为空 → 该条跳过并告警，不算失败、不让整步红', () => {
+  const warns: string[] = [];
+  const r = resolveAssert({ min_chars: '{{length}} * 0.7', max_chars: 900 }, new Map([['length', '']]), (m) => warns.push(m));
+  assert(r.min_chars === undefined && r.max_chars === 900, '空变量那条变 undefined，另一条保留');
+  assert(warns.length === 1 && warns[0].includes('{{length}} * 0.7') && warns[0].includes('跳过'), `告警要带原文与"跳过"：${warns.join('|')}`);
+  assert(checkAssert('短', r).pass, 'min_chars 跳过后不再拦');
+});
+
+test('解析期：min_chars 允许 "{{变量}} * 系数" 字符串，乱写的字符串要报错', () => {
+  const ok = assertErrors(`name: t
+llm:
+  provider: claude-code
+  model: sonnet
+inputs:
+  - name: length
+    default: "3000"
+steps:
+  - id: a
+    role: engineering/engineering-sre
+    task: 写 {{length}} 字
+    assert:
+      min_chars: "{{length}} * 0.7"
+      max_chars: 5000
+`);
+  assert(ok.length === 0, `合法写法不该报错：${ok.join('; ')}`);
+  const bad = assertErrors(BASE('    assert:\n      min_chars: "大概三千字"\n'));
+  assert(bad.some((e) => e.includes('min_chars') && e.includes('{{length}} * 0.7')), `乱写要报错并给出示例写法：${bad.join('; ')}`);
+  const neg = assertErrors(BASE('    assert:\n      max_chars: -1\n'));
+  assert(neg.some((e) => e.includes('max_chars')), '负数要报错');
+});
+
+test('解析期：min_chars 引用了不存在的变量要在 validate 就报，别等运行期"本条跳过"', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ao-assert-'));
+  const f = join(dir, 'wf.yaml');
+  writeFileSync(f, BASE('    assert:\n      min_chars: "{{nope}} * 0.7"\n'), 'utf8');
+  const errs = validateWorkflow(parseWorkflow(f), resolve('agency-agents'));
+  assert(errs.some((e) => e.includes('nope')), `应点名未定义变量 nope，实得：${errs.join('; ')}`);
 });
 
 test('解析期：合法 assert 不报错', () => {

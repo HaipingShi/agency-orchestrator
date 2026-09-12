@@ -161,7 +161,8 @@ steps:
     task: "Task with {{variables}}"
     acceptance: "1. checkable condition…"  # optional: injected at prompt tail; output auto-verified against it after the step runs (fail → one auto-rework round); judge anchor in --compare
     assert:                          # optional mechanical check (core/assert.ts) — no model, no network, no tokens.
-      contains: ["【声音】"]          #   模型审内容，脚本审结构：emits_files / min_bytes / max_bytes / contains / matches.
+      contains: ["【声音】"]          #   模型审内容，脚本审结构：emits_files / min_bytes / max_bytes / min_chars / max_chars / contains / matches.
+      min_chars: "{{length}} * 0.7"  #   字数 = 非空白字符数（中文一字一计）；可引用输入变量 × 系数，运行期按实际输入算（bytes 不认变量）。变量为空 → 该条跳过并告警
       max_bytes: 900                 #   Fail → one targeted rework, then the step FAILS (unlike acceptance). Use it to stop
                                      #   a bad prompt *before* a per-second video step spends money.
     verify: false                    # optional: opt this step out of acceptance auto-verify (top-level `verify: false` disables whole workflow; CLI --verify/--no-verify overrides; default on)

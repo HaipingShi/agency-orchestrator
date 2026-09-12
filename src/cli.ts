@@ -277,9 +277,10 @@ async function handleRun(): Promise<void> {
         // 没声明的保持老口径——全部完成步骤按顺序拼
         const { deliverableSteps } = await import('./types.js');
         const picked = result.deliverables?.length ? deliverableSteps(result) : result.steps.filter(s => s.status === 'completed' && s.output);
+        // 产出自己以标题开头（分章小说每章第一行是 "## 第N章 …"）就不再套一层步骤名标题
         const md = picked.length === 1 && result.deliverables?.length
           ? String(picked[0].output)
-          : picked.map(s => `## ${s.agentName || s.role || s.id}\n\n${s.output}`).join('\n\n---\n\n');
+          : picked.map(s => /^\s*#/.test(String(s.output)) ? String(s.output).trim() : `## ${s.agentName || s.role || s.id}\n\n${s.output}`).join('\n\n---\n\n');
         if (!md) {
           console.log(`\n  ⚠️ --export：本次运行没有可导出的产出。`);
         } else {

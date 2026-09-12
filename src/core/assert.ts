@@ -28,11 +28,53 @@
  *   响应的 errors[] 点名字段与可用取值;不写 assert 的老工作流照常保存,无回归。
  */
 import { parseFileBlocks } from '../cli/materialize.js';
+import { renderTemplate } from './template.js';
 import type { StepAssert } from '../types.js';
 
 export interface AssertResult {
   pass: boolean;
   failures: string[];   // 人话的未通过项,直接可进报错信息与返工提示
+}
+
+/** 字数:非空白字符数,按码点计(中文一字一计,emoji 一个算一个)。这是写作类模板说的"字数"。 */
+export function countChars(text: string): number {
+  return Array.from(text.replace(/\s+/g, '')).length;
+}
+
+/** min_chars / max_chars 的字符串写法:`<数字>` 或 `<数字> * <系数>`,数字位可以是 {{变量}}。 */
+const CHAR_SPEC_RE = /^\s*(\d+(?:\.\d+)?)\s*(?:\*\s*(\d+(?:\.\d+)?))?\s*$/;
+
+/** 解析期校验:非负整数,或把 {{变量}} 占位成 1 后能过 CHAR_SPEC_RE 的字符串。 */
+export function isValidCharSpec(v: unknown): boolean {
+  if (typeof v === 'number') return Number.isInteger(v) && v >= 0;
+  if (typeof v !== 'string') return false;
+  return CHAR_SPEC_RE.test(v.replace(/\{\{\s*\w+\s*\}\}/g, '1'));
+}
+
+/**
+ * 运行期把 min_chars / max_chars 的字符串写法算成数字(其余字段原样)。
+ * 变量为空或渲染后算不成数字 → 该条**跳过并告警**,不算失败:可选输入没填是合法状态,
+ * 不该让一整步红掉;但也绝不静默——告警里带原文和渲染结果,一眼能看出是哪个变量空了。
+ */
+export function resolveAssert(
+  spec: StepAssert,
+  context: Map<string, string>,
+  warn: (msg: string) => void = () => {},
+): StepAssert {
+  const out: StepAssert = { ...spec };
+  for (const k of ['min_chars', 'max_chars'] as const) {
+    const v = spec[k];
+    if (typeof v !== 'string') continue;
+    const rendered = renderTemplate(v, context);
+    const m = rendered.match(CHAR_SPEC_RE);
+    if (!m) {
+      warn(`assert.${k} 「${v}」渲染后是「${rendered.trim()}」，算不成数字（引用的变量为空？），本条跳过`);
+      out[k] = undefined;
+      continue;
+    }
+    out[k] = Math.round(parseFloat(m[1]) * (m[2] ? parseFloat(m[2]) : 1));
+  }
+  return out;
 }
 
 /** 把 matches 的键编译成正则。默认多行(^ $ 按行),这样 "^## " 才是常识里的意思。 */
@@ -83,6 +125,21 @@ export function checkAssert(content: string, spec: StepAssert): AssertResult {
     const got = Buffer.byteLength(content, 'utf8');
     if (got > spec.max_bytes) {
       failures.push(`产出太长:要求至多 ${spec.max_bytes} 字节,实际 ${got} 字节(需要压缩,删冗余形容词、合并短句)`);
+    }
+  }
+
+  // 字数按非空白字符数,是写作类模板要的口径(bytes 对中文是 3 倍,用户按"字"想、按"字节"配总会配错)。
+  // 字符串写法(带变量)必须先经 resolveAssert 算成数字;这里遇到字符串说明调用方漏了那一步,直接跳过不猜。
+  if (typeof spec.min_chars === 'number') {
+    const got = countChars(content);
+    if (got < spec.min_chars) {
+      failures.push(`产出太短:要求至少 ${spec.min_chars} 字(非空白字符),实际 ${got} 字(疑似截断或写短了)`);
+    }
+  }
+  if (typeof spec.max_chars === 'number') {
+    const got = countChars(content);
+    if (got > spec.max_chars) {
+      failures.push(`产出太长:要求至多 ${spec.max_chars} 字(非空白字符),实际 ${got} 字(需要压缩)`);
     }
   }
 

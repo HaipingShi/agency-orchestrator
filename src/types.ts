@@ -180,6 +180,13 @@ export interface StepAssert {
   emits_files?: number;              // 产出里的文件块数量必须恰好等于此值（解析规则与 --materialize 完全一致）
   min_bytes?: number;                // 产出最小字节数（UTF-8），防截断
   max_bytes?: number;                // 产出最大字节数（UTF-8），防超长——提示词过长会被视频厂商直接拒收
+  /**
+   * 产出的字数下/上限——按**非空白字符数**（码点）算，中文一字一计，是写作类模板说的"字数"。
+   * 与 bytes 的差别：可以写成字符串引用输入变量并乘系数，如 "{{length}} * 0.7"（运行期按实际输入算），
+   * 这样"目标字数"是用户在输入框里选的，模板不用按最小档写死下限。
+   */
+  min_chars?: number | string;
+  max_chars?: number | string;
   contains?: string[];               // 必须出现的字面串
   matches?: Record<string, number>;  // 正则 → 必须命中的次数。裸模式默认 gm；也可写 /pattern/flags
 }

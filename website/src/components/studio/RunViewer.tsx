@@ -45,9 +45,10 @@ export function RunViewer({ onViewHistory, onGoProviders }: { onViewHistory?: ()
   const fullText = useMemo(() => {
     if (!run) return "";
     if (hasDeliverable && !exportAll) {
+      // 产出自己以标题开头（分章小说每章第一行是 "## 第N章 …"）就不再套一层步骤名标题
       return deliverableSteps.length === 1
         ? deliverableSteps[0].content.trim()
-        : deliverableSteps.map((s) => `## ${s.name ?? s.id}\n\n${s.content.trim()}`).join("\n\n---\n\n");
+        : deliverableSteps.map((s) => (/^\s*#/.test(s.content) ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`)).join("\n\n---\n\n");
     }
     return run.steps
       .filter((s) => s.content.trim())

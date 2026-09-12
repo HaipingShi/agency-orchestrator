@@ -668,6 +668,7 @@ ao-output/产品需求评审-2026-03-22/
 | `product-review.yaml` | 产品经理、架构师、UX 研究员 | 产品需求评审 |
 | `content-pipeline.yaml` | 策略师、创作者、增长黑客 | 内容创作流水线 |
 | `story-creation.yaml` | 叙事学家、心理学家、执笔作者、责任编辑 | 短篇小说：结构 → 人物 → 成稿 → 审读 → 定稿（只交付定稿） |
+| `novel-chapters.yaml` | 叙事学家、心理学家、执笔作者 | 中篇小说五章：大纲 + 伏笔清单 → 人物圣经 → 逐章执笔（读上一章全文 + 事实账本）→ 连贯性审校；导出即书稿 |
 | `ai-opinion-article.yaml` | 趋势研究员、叙事设计师、心理学家、创作者 | AI 观点长文 |
 | `department-collab/code-review.yaml` | 代码审查员、安全工程师 | 代码评审（循环） |
 | `department-collab/hiring-pipeline.yaml` | HR、技术面试官、业务面试官 | 招聘流程 |

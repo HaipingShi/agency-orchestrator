@@ -637,6 +637,7 @@ ao run workflows/en/solo-founder-plan.yaml -i idea="Your idea here"
 | `product-review.yaml` | PM, Architect, UX Researcher | Product requirements review |
 | `content-pipeline.yaml` | Strategist, Creator, Growth Hacker | Content creation pipeline |
 | `story-creation.yaml` | Narratologist, Psychologist, Writer, Editor | Short fiction: structure → characters → draft → editorial review → final (only the final is delivered) |
+| `novel-chapters.yaml` | Narratologist, Psychologist, Writer | Five-chapter novella: outline + foreshadowing list → character bible → chapter by chapter (each reads the previous chapter + a fact ledger) → continuity review; export = manuscript |
 | `ai-opinion-article.yaml` | Trend Researcher, Narrative Designer, Psychologist, Creator | AI opinion long-form article |
 | `department-collab/code-review.yaml` | Code Reviewer, Security Engineer | Code review (review loop) |
 | `department-collab/hiring-pipeline.yaml` | HR, Tech Interviewer, Biz Interviewer | Hiring pipeline |

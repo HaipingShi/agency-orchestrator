@@ -4,6 +4,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { extractVariables } from './template.js';
 import { evaluateCondition } from './condition.js';
+import { isValidCharSpec } from './assert.js';
 import yaml from 'js-yaml';
 import type { WorkflowDefinition, StepDefinition } from '../types.js';
 import { t } from '../i18n.js';
@@ -330,7 +331,7 @@ export function validateWorkflow(workflow: WorkflowDefinition, agentsDir?: strin
       if (typeof a !== 'object' || a === null || Array.isArray(a)) {
         errors.push(`step "${step.id}" 的 assert 必须是映射（emits_files / min_bytes / max_bytes / contains / matches）`);
       } else {
-        const known = ['emits_files', 'min_bytes', 'max_bytes', 'contains', 'matches'];
+        const known = ['emits_files', 'min_bytes', 'max_bytes', 'min_chars', 'max_chars', 'contains', 'matches'];
         for (const k of Object.keys(a)) {
           if (!known.includes(k)) errors.push(`step "${step.id}" 的 assert 不认识字段 "${k}"（可用：${known.join(' / ')}）`);
         }
@@ -340,9 +341,19 @@ export function validateWorkflow(workflow: WorkflowDefinition, agentsDir?: strin
             errors.push(`step "${step.id}" 的 assert.${k} 必须是非负整数`);
           }
         }
+        // 字数（非空白字符）允许字符串：引用输入变量再乘系数，运行期按实际输入算
+        for (const k of ['min_chars', 'max_chars']) {
+          const v = a[k];
+          if (v !== undefined && !isValidCharSpec(v)) {
+            errors.push(`step "${step.id}" 的 assert.${k} 必须是非负整数，或形如 "{{length}} * 0.7" 的字符串（变量 × 系数）`);
+          }
+        }
         // 自相矛盾的区间是配错,不是"永远不过"——不在解析期拦下,就会每步都返工一轮再失败。
         if (typeof a.min_bytes === 'number' && typeof a.max_bytes === 'number' && a.min_bytes > a.max_bytes) {
           errors.push(`step "${step.id}" 的 assert.min_bytes(${a.min_bytes}) 大于 max_bytes(${a.max_bytes})，没有产出能同时满足`);
+        }
+        if (typeof a.min_chars === 'number' && typeof a.max_chars === 'number' && a.min_chars > a.max_chars) {
+          errors.push(`step "${step.id}" 的 assert.min_chars(${a.min_chars}) 大于 max_chars(${a.max_chars})，没有产出能同时满足`);
         }
         if (a.contains !== undefined && (!Array.isArray(a.contains) || a.contains.some((x) => typeof x !== 'string'))) {
           errors.push(`step "${step.id}" 的 assert.contains 必须是字符串数组`);
@@ -376,6 +387,8 @@ export function validateWorkflow(workflow: WorkflowDefinition, agentsDir?: strin
     if (step.loop?.exit_condition) refTexts.push(step.loop.exit_condition);
     if (step.prompt) refTexts.push(step.prompt);
     if (typeof step.acceptance === 'string') refTexts.push(step.acceptance);
+    // 字数断言的字符串写法引用输入变量：写错变量名要在 validate 就拦，别等到运行期"本条跳过"
+    for (const v of [step.assert?.min_chars, step.assert?.max_chars]) if (typeof v === 'string') refTexts.push(v);
     // 媒体字段也会过变量渲染：写错变量名要在 validate 就拦住，别等到图生视频/合成时报"找不到图片"
     for (const v of Object.values(step.image ?? {})) if (typeof v === 'string') refTexts.push(v);
     for (const v of Object.values(step.video ?? {})) if (typeof v === 'string') refTexts.push(v);

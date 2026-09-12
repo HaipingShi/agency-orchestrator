@@ -110,6 +110,83 @@
       ]
     },
     {
+      "name": "中篇小说·分章创作",
+      "description": "五章固定：叙事学家出全书大纲与伏笔清单 → 心理学家写人物圣经 → 逐章执笔（每章读大纲、人物、上一章全文与「事实账本」）→ 每章后账本更新 → 全书连贯性审校。交付物只有五章正文，导出即成书稿。",
+      "category": "内容创作",
+      "steps": [
+        {
+          "id": "outline",
+          "role": "academic/academic-narratologist",
+          "name": "叙事学家 · 全书大纲"
+        },
+        {
+          "id": "bible",
+          "role": "academic/academic-psychologist",
+          "name": "心理学家 · 人物圣经"
+        },
+        {
+          "id": "ch1",
+          "role": "marketing/marketing-content-creator",
+          "name": "第一章",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger1",
+          "role": "academic/academic-narratologist",
+          "name": "账本 · 第一章后",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch2",
+          "role": "marketing/marketing-content-creator",
+          "name": "第二章",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger2",
+          "role": "academic/academic-narratologist",
+          "name": "账本 · 第二章后",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch3",
+          "role": "marketing/marketing-content-creator",
+          "name": "第三章",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger3",
+          "role": "academic/academic-narratologist",
+          "name": "账本 · 第三章后",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch4",
+          "role": "marketing/marketing-content-creator",
+          "name": "第四章",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger4",
+          "role": "academic/academic-narratologist",
+          "name": "账本 · 第四章后",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch5",
+          "role": "marketing/marketing-content-creator",
+          "name": "第五章",
+          "emoji": "🖋"
+        },
+        {
+          "id": "review",
+          "role": "academic/academic-narratologist",
+          "name": "连贯性审校",
+          "emoji": "🧐"
+        }
+      ]
+    },
+    {
       "name": "AI 一人公司：全员大会",
       "description": "你说一句话，9 个 AI 部门自动协作，2 分钟出完整商业方案——这就是一人公司",
       "category": "一人公司",

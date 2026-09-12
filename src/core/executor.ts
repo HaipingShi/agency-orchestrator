@@ -24,7 +24,7 @@ import { generateSpeech, type TtsStepOptions } from '../connectors/tts.js';
 import { verifyAcceptance, buildReworkBlock, formatFailedItems, verifyImageAcceptance, verifyVisualAcceptance, buildImageReworkPrompt, canSeeImages } from './verify.js';
 import { extractFrames, jpegDataUri } from '../media/frames.js';
 import { FfmpegMissingError } from '../media/concat.js';
-import { checkAssert, buildAssertReworkBlock } from './assert.js';
+import { checkAssert, resolveAssert, buildAssertReworkBlock } from './assert.js';
 import { createInterface } from 'node:readline';
 
 export interface ExecutorOptions {
@@ -974,7 +974,9 @@ async function executeStep(
   //    理由是这类问题的破坏方式不同——少一个文件不会让下游报错，它会让下游
   //    拿着缺件的产物一路绿灯跑完。带 ⚠️ 放行等于把静默损坏留给下一环。
   if (node.step.assert) {
-    const first = checkAssert(content, node.step.assert);
+    // min_chars / max_chars 可以是 "{{length}} * 0.7" 这种带变量的写法——先按本次输入算成数字
+    const assertSpec = resolveAssert(node.step.assert, opts.context, (m) => process.stderr.write(`  ⚠️  ${node.step.id} ${m}\n`));
+    const first = checkAssert(content, assertSpec);
     if (!first.pass) {
       process.stderr.write(`\n  ⟳ ${node.step.id} 机械断言未过（${first.failures.length} 条），定向返工一轮...\n`);
       first.failures.forEach((f) => process.stderr.write(`      · ${f}\n`));
@@ -985,7 +987,7 @@ async function executeStep(
         const msg = err instanceof Error ? err.message.slice(0, 80) : String(err);
         throw new Error(`step "${node.step.id}" 机械断言未过且返工生成失败（${msg}）：\n  - ${first.failures.join('\n  - ')}`);
       }
-      const second = checkAssert(retried, node.step.assert);
+      const second = checkAssert(retried, assertSpec);
       if (!second.pass) {
         // 到这里就停。宁可让这一步红着，也不能让缺件的产物流下去——
         // 静默损坏比失败贵得多：失败当场就知道，缺件要等上线后才发现。
