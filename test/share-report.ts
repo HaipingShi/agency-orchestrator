@@ -41,6 +41,21 @@ assert(html.includes('prefers-color-scheme'), '带暗色适配');
 const single = renderShareReport({ name: 'x', steps: [{ id: 'only', markdown: 'hi' }] });
 assert(!single.includes('⭐ 最终成品'), '单步骤不标最终成品');
 
+// ── 声明了 deliverables：⭐ 标声明的那步，不标末步 ──
+const declared = renderShareReport({
+  name: 'novel',
+  deliverables: ['final'],
+  steps: [
+    { id: 'outline', agentName: '叙事学家', markdown: '大纲' },
+    { id: 'final', agentName: '定稿', markdown: '正文' },
+    { id: 'retro', agentName: '复盘', markdown: '复盘' },
+  ],
+});
+const starOf = (html: string, name: string) => new RegExp(`${name}[^<]*<span class="star">`).test(html);
+assert(starOf(declared, '定稿') && !starOf(declared, '复盘') && !starOf(declared, '叙事学家'), 'deliverables 声明的步骤带 ⭐，末步不带');
+const declaredMiss = renderShareReport({ name: 'n', deliverables: ['nope'], steps: [{ id: 'a', markdown: 'a' }, { id: 'b', agentName: '末步', markdown: 'b' }] });
+assert(starOf(declaredMiss, '末步'), 'deliverables 都对不上步骤时退回末步标 ⭐');
+
 // ── 图片内联 ──
 const withImg = renderShareReport({
   name: 'img',

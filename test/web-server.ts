@@ -86,6 +86,10 @@ try {
 
     const wfs = await (await fetch(base + '/api/workflows')).json();
     assert(Array.isArray(wfs), '/api/workflows 返回数组');
+    // 模板声明的交付物步骤要透传给 Studio（导出/复制默认只带成稿）；没声明的不带该字段
+    const storyWf = wfs.find((w: { filename?: string }) => w.filename === 'story-creation.yaml');
+    assert(Array.isArray(storyWf?.deliverables) && storyWf.deliverables.join() === 'final_story', `/api/workflows 透传 deliverables（实际 ${JSON.stringify(storyWf?.deliverables)}）`);
+    assert(wfs.some((w: { deliverables?: string[] }) => w.deliverables === undefined), '未声明 deliverables 的模板不带该字段');
 
     // ── 安全守卫(最关键) ──
     assert(await post(base, '/api/run', { file: '../../../../etc/passwd' }) === 403, '/api/run 路径穿越 → 403');

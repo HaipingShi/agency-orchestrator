@@ -32,8 +32,9 @@ function DetailPane({ id, provider, onRun }: { id: string; provider: string; onR
           tokens: r.tokens ?? r.totalTokens,
         };
         setRun(norm);
-        // auto-expand the final deliverable
-        const last = [...(norm.steps ?? [])].reverse().find((s) => s.content?.trim());
+        // auto-expand the final deliverable（模板声明了 deliverables 就展开声明的那步）
+        const declared = (norm.deliverables ?? []).map((d) => norm.steps?.find((s) => s.id === d && s.content?.trim())).filter(Boolean);
+        const last = declared[declared.length - 1] ?? [...(norm.steps ?? [])].reverse().find((s) => s.content?.trim());
         setOpen(last?.id ?? null);
       })
       .catch((e) => setErr(e.message));
@@ -47,8 +48,13 @@ function DetailPane({ id, provider, onRun }: { id: string; provider: string; onR
       .join("\n\n---\n\n");
   }, [run]);
 
+  // 「复制结果 / 下载结果」取的成品：metadata 里的 deliverables（引擎同一口径），
+  // 没声明或声明的都没产出时退回最后一个有内容的步
   const finalStep = useMemo(() => {
     const ss = run?.steps ?? [];
+    const declared = (run?.deliverables ?? []).map((d) => ss.find((s) => s.id === d && s.content?.trim())).filter((s): s is NonNullable<typeof s> => !!s);
+    if (declared.length === 1) return declared[0];
+    if (declared.length > 1) return { ...declared[declared.length - 1], content: declared.map((s) => s.content!.trim()).join("\n\n---\n\n") };
     return [...ss].reverse().find((s) => s.content?.trim()) ?? null;
   }, [run]);
 

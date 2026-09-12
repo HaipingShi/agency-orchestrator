@@ -4,7 +4,7 @@
 import { stripImageDataUris } from '../utils/vision.js';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import type { WorkflowResult, StepVerification } from '../types.js';
+import { deliverableSteps, type WorkflowResult, type StepVerification } from '../types.js';
 import type { DAGNode } from '../types.js';
 
 /**
@@ -112,8 +112,8 @@ export function saveResults(result: WorkflowResult, outputDir: string): string {
   }
   summaryLines.push('## 产出文件', '');
 
-  // 找到最终成品（最后一个成功步骤）
-  const lastCompleted = [...result.steps].reverse().find(s => s.status === 'completed');
+  // 最终成品：工作流声明的 deliverables，没声明就是最后一个成功步骤
+  const finals = new Set(deliverableSteps(result));
 
   for (let i = 0; i < result.steps.length; i++) {
     const step = result.steps[i];
@@ -121,7 +121,7 @@ export function saveResults(result: WorkflowResult, outputDir: string): string {
     const status = step.status === 'completed' ? '✅' :
                    step.status === 'failed' ? '❌' :
                    step.status === 'skipped' ? '⏭️' : '⏳';
-    const isFinal = step === lastCompleted;
+    const isFinal = finals.has(step);
     const emoji = step.agentEmoji || '🤖';
     const name = step.agentName || step.role || step.id;
     const duration = step.duration ? ` | ${(step.duration / 1000).toFixed(1)}s` : '';
@@ -136,11 +136,13 @@ export function saveResults(result: WorkflowResult, outputDir: string): string {
   }
 
   // 如果有最终成品，在顶部加快速入口
-  if (lastCompleted) {
-    const lastIdx = result.steps.indexOf(lastCompleted);
-    const lastFile = `${lastIdx + 1}-${lastCompleted.id}.md`;
+  if (finals.size) {
+    const links = [...finals].map((s) => {
+      const f = `${result.steps.indexOf(s) + 1}-${s.id}.md`;
+      return `[steps/${f}](steps/${f})`;
+    });
     summaryLines.splice(4, 0,
-      `**👉 最终成品: [steps/${lastFile}](steps/${lastFile})**`,
+      `**👉 最终成品: ${links.join('  ')}**`,
       '',
     );
   }
@@ -151,6 +153,7 @@ export function saveResults(result: WorkflowResult, outputDir: string): string {
   const metadata: Record<string, unknown> = {
     name: result.name,
     file: result.file,
+    deliverables: result.deliverables,
     // 完成时刻（绝对时间）。目录名里的时间戳是 UTC，展示层若直接把它当本地时间显示，
     // 非 UTC 用户看到的时间就是错的（#101）——查看器一律读这个字段按系统时区渲染。
     finishedAt: new Date().toISOString(),

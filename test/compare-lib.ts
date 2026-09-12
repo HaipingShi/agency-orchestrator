@@ -83,6 +83,23 @@ test('取最后一个有产出的已完成步骤', () => {
   assert(finalOutput(r) === '终稿', `应取终稿, 实际 ${finalOutput(r)}`);
 });
 
+test('声明了 deliverables 就按声明取，而不是最后一步', () => {
+  // 小说线：定稿之后还挂了一步"编辑复盘"——盲评该评定稿，不该评复盘
+  const r = {
+    deliverables: ['final'],
+    steps: [
+      { id: 'outline', status: 'completed', output: '大纲' },
+      { id: 'final', status: 'completed', output: '定稿' },
+      { id: 'retro', status: 'completed', output: '复盘' },
+    ],
+  } as unknown as WorkflowResult;
+  assert(finalOutput(r) === '定稿', `应取声明的交付物, 实际 ${finalOutput(r)}`);
+  const multi = { ...r, deliverables: ['outline', 'final'] } as unknown as WorkflowResult;
+  assert(finalOutput(multi) === '大纲\n\n---\n\n定稿', '多个交付物按步骤顺序拼接');
+  const missed = { ...r, deliverables: ['nope'] } as unknown as WorkflowResult;
+  assert(finalOutput(missed) === '复盘', '声明的都没产出 → 退回最后一个完成步');
+});
+
 // ── formatCompareReport（CLI 报告，纯函数）──
 test('报告含胜者/分数/理由', () => {
   const out = formatCompareReport({

@@ -29,6 +29,8 @@ export interface ShareReportData {
   totalDuration?: string;
   totalTokens?: { input?: number; output?: number };
   steps: ShareStep[];
+  /** 工作流声明的交付物步骤 id（metadata.deliverables）：⭐ 标它们而不是末步 */
+  deliverables?: string[];
   /** 由调用方传入（如 new Date().toLocaleString()），渲染保持纯函数可测 */
   generatedAt?: string;
   /** 相对资源路径 → data URI；返回 null 表示保持原样 */
@@ -130,6 +132,7 @@ export function renderRunDirReport(runDir: string, generatedAt?: string): string
     totalDuration: meta.totalDuration,
     totalTokens: meta.totalTokens,
     steps,
+    deliverables: Array.isArray(meta.deliverables) ? meta.deliverables.map(String) : undefined,
     generatedAt,
     resolveAsset,
   });
@@ -144,9 +147,11 @@ export function renderShareReport(d: ShareReportData): string {
   if (tokens > 0) chips.push(`${tokens.toLocaleString()} tokens`);
   if (d.success !== undefined) chips.push(d.success ? '✅ 全部完成' : '⚠️ 部分完成');
 
+  // 声明了 deliverables（且确有对应步骤）就按声明标 ⭐，否则沿用"末步 = 最终成品"
+  const declared = (d.deliverables ?? []).filter((id) => d.steps.some((s) => s.id === id));
   const stepsHtml = d.steps
     .map((s, i) => {
-      const isFinal = i === d.steps.length - 1 && d.steps.length > 1;
+      const isFinal = declared.length ? declared.includes(s.id) : i === d.steps.length - 1 && d.steps.length > 1;
       const title = `${s.agentEmoji ? esc(s.agentEmoji) + ' ' : ''}${esc(s.agentName || s.id)}`;
       const meta: string[] = [];
       if (s.role) meta.push(esc(s.role));

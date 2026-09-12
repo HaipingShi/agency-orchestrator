@@ -38,6 +38,8 @@ export type RunRequest =
       fromStep?: string;
       feedback?: string;
       cast?: WorkflowStepMeta[];
+      /** 交付物步骤 id（模板声明）：RunViewer 导出/复制默认只取这些步 */
+      deliverables?: string[];
       materialize?: boolean;
     }
   | { kind: "role"; title: string; role: string; emoji?: string; name?: string; task: string; provider?: string; lang?: string };

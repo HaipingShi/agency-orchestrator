@@ -145,6 +145,8 @@ concurrency: 2
 verify_llm: { provider: "agnes", model: "agnes-2.0-flash" }   # optional: which model acts as the acceptance reviewer (default: the text provider).
                                                               # Image/video acceptance needs a vision-capable API model and DeepSeek can't see images — set this
                                                               # (or CLI --verify-provider/--verify-model) instead of hand-adding `llm:` to every media step. Step-level `llm:` still wins.
+deliverables: [final_story]     # optional: which step(s) are the deliverable. Export (--export / Studio 导出·复制·下载), summary ⭐ and --compare
+                                # judging take ONLY these; drafts/outlines/review notes stay in the run dir. Omit = last completed step. Bad id → validate error.
 
 inputs:
   - name: variable_name

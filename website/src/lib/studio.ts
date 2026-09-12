@@ -63,6 +63,8 @@ export interface Workflow {
   inputs?: WorkflowInput[];
   steps?: WorkflowStepMeta[];
   provider?: string;
+  /** 交付物步骤 id：导出 / 复制默认只带这些步，过程稿（大纲、人设、审读意见）不混进成品 */
+  deliverables?: string[];
   private?: boolean;
   category?: string;
   featured?: boolean;
@@ -105,6 +107,8 @@ export interface RunSummary {
   thumb?: string;
   /** 有 mp4 产物（视频 / 合成步骤） */
   hasVideo?: boolean;
+  /** 模板声明的交付物步骤 id（metadata.json）——「复制/下载结果」取它，而不是最后一步 */
+  deliverables?: string[];
   steps?: RunStepSummary[];
   /** 完成时刻（UTC ISO）。目录名里的时间戳是 UTC，显示一律用这个字段按本地时区渲染。 */
   startedAt?: string;

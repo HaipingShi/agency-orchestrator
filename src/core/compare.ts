@@ -6,17 +6,16 @@
  * 避免逻辑分叉。方法学见 EVAL_FINDINGS.md：双向盲评取平均以抵消 LLM 评审的位置偏置。
  */
 import { createConnector } from '../connectors/factory.js';
-import type { LLMConfig, WorkflowResult } from '../types.js';
+import { deliverableSteps, type LLMConfig, type WorkflowResult } from '../types.js';
 
 // 截断上限要足够大：太小会把更长/更完整产出的尾部（常含结论）切掉，系统性惩罚长产出，
 // 而"完整性"正是要评的维度。强 judge 可吃数万字。
 const JUDGE_TRUNC = 20000;
 const trunc = (s: string) => (s.length > JUDGE_TRUNC ? s.slice(0, JUDGE_TRUNC) + '\n…[截断]' : s);
 
-/** 取工作流最后一个"已完成且有产出"的步骤作为最终成品。 */
+/** 最终成品：工作流声明的 deliverables（多个则拼接），没声明就是最后一个"已完成且有产出"的步骤。 */
 export function finalOutput(result: WorkflowResult): string {
-  const done = result.steps.filter((s) => s.status === 'completed' && s.output);
-  return done.length ? String(done[done.length - 1].output) : '';
+  return deliverableSteps(result).map((s) => String(s.output)).join('\n\n---\n\n');
 }
 
 /** 把工作流目标+输入合成"单次直接要成品"的基线 prompt（模拟用户不用 ao 的写法）。 */

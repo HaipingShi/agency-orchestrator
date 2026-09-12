@@ -273,10 +273,13 @@ async function handleRun(): Promise<void> {
       if (!allowed.includes(exportFmt)) {
         console.error(`\n  ⚠️ --export 仅支持: ${allowed.join(' / ')}`);
       } else {
-        const md = result.steps
-          .filter(s => s.status === 'completed' && s.output)
-          .map(s => `## ${s.agentName || s.role || s.id}\n\n${s.output}`)
-          .join('\n\n---\n\n');
+        // 声明了 deliverables 的工作流只导交付物（成稿），不把大纲/人设/审读意见排在正文前面；
+        // 没声明的保持老口径——全部完成步骤按顺序拼
+        const { deliverableSteps } = await import('./types.js');
+        const picked = result.deliverables?.length ? deliverableSteps(result) : result.steps.filter(s => s.status === 'completed' && s.output);
+        const md = picked.length === 1 && result.deliverables?.length
+          ? String(picked[0].output)
+          : picked.map(s => `## ${s.agentName || s.role || s.id}\n\n${s.output}`).join('\n\n---\n\n');
         if (!md) {
           console.log(`\n  ⚠️ --export：本次运行没有可导出的产出。`);
         } else {

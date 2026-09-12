@@ -167,6 +167,10 @@ export function parseWorkflow(
     concurrency: (doc.concurrency as number) || 2,
     verify: doc.verify as boolean | undefined,
     verify_llm: doc.verify_llm as WorkflowDefinition['verify_llm'],
+    // 单个 id 也允许写成字符串：`deliverables: final_story`
+    deliverables: doc.deliverables === undefined ? undefined
+      : Array.isArray(doc.deliverables) ? (doc.deliverables as unknown[]).map(String)
+      : [String(doc.deliverables)],
     inputs: doc.inputs as WorkflowDefinition['inputs'],
     steps,
   };
@@ -211,6 +215,16 @@ export function validateWorkflow(workflow: WorkflowDefinition, agentsDir?: strin
     const v = workflow.verify_llm as Record<string, unknown> | null;
     if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.provider !== 'string' || !v.provider.trim()) {
       errors.push(`顶层 verify_llm 必须是 { provider: "<供应商>", model: "<模型>" }（验收员模型；看图验收要选支持 vision 的 API 模型）`);
+    }
+  }
+
+  // deliverables 必须指向真实步骤：写错 id 会静默退回"最后一步"，用户导出时才发现拿到的是过程稿
+  if (workflow.deliverables !== undefined) {
+    if (!workflow.deliverables.length) {
+      errors.push('顶层 deliverables 不能为空列表（不写 = 默认最后一个完成的步骤）');
+    }
+    for (const id of workflow.deliverables) {
+      if (!stepIds.has(id)) errors.push(`顶层 deliverables 引用不存在的 step: "${id}"`);
     }
   }
 

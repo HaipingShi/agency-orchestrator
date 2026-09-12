@@ -347,6 +347,7 @@ export async function run(
         const interrupted: import('./types.js').WorkflowResult = {
           name: workflow.name,
           file: resolve(workflowPath),
+          deliverables: workflow.deliverables,
           success: false,
           steps: dag.levels.flat().map(id => {
             const node = dag.nodes.get(id)!;
@@ -430,6 +431,7 @@ export async function run(
   result.name = workflow.name;
   // 源文件绝对路径随 metadata 存档——历史记录的"重跑/从某步续跑"靠它定位工作流
   result.file = resolve(workflowPath);
+  result.deliverables = workflow.deliverables;
   // 保存原始用户输入，便于 --resume 下次恢复
   result.inputs = Object.fromEntries(
     Array.from(inputMap.entries()).filter(([k]) =>

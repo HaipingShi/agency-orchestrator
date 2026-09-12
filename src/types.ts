@@ -13,6 +13,12 @@ export interface WorkflowDefinition {
    * 写 { provider, model } 即可；key 按供应商的环境变量/已存配置解析，不从文本供应商带过去。
    */
   verify_llm?: Partial<LLMConfig>;
+  /**
+   * 交付物步骤 id（缺省 = 最后一个完成的步骤）。多步工作流里前面几步往往是施工图
+   * （大纲 / 人设 / 审读意见），只有最后一两步是用户要拿走的东西——导出 Word/PDF、
+   * --compare 盲评、summary 的 ⭐ 都以这里为准，不再把过程稿一股脑塞在成品前面。
+   */
+  deliverables?: string[];
   inputs?: InputDefinition[];
   steps: StepDefinition[];
 }
@@ -221,6 +227,23 @@ export interface WorkflowResult {
   inputs?: Record<string, string>;
   /** 源工作流文件绝对路径（随 metadata 存档，供历史记录重跑/续跑定位源文件） */
   file?: string;
+  /** 工作流声明的交付物步骤 id（见 WorkflowDefinition.deliverables）；随 metadata 存档 */
+  deliverables?: string[];
+}
+
+/**
+ * 取"用户要拿走的那几步"：声明了 deliverables 就按声明（只算完成且有产出的），
+ * 没声明或声明的一个都没完成，退回旧口径——最后一个完成且有产出的步骤。
+ * 导出 / 盲评 / summary 共用这一处，别各写一份。
+ */
+export function deliverableSteps(result: Pick<WorkflowResult, 'steps' | 'deliverables'>): StepResult[] {
+  const done = result.steps.filter((s) => s.status === 'completed' && s.output);
+  if (result.deliverables?.length) {
+    const want = new Set(result.deliverables);
+    const picked = done.filter((s) => want.has(s.id));
+    if (picked.length) return picked;
+  }
+  return done.length ? [done[done.length - 1]] : [];
 }
 
 export interface StepResult {

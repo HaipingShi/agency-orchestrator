@@ -563,6 +563,8 @@ function loadWorkflowMeta(dir, tagPrivate = false, deletable = false) {
             return { id: s.id, role: s.role, name: name || s.id, emoji: emoji || '🤖', ...(s.type ? { type: s.type } : {}) };
           }),
           provider: doc?.llm?.provider,
+          // 交付物步骤 id（引擎 WorkflowDefinition.deliverables）：Studio 导出/复制默认只带这些步
+          ...(doc?.deliverables ? { deliverables: (Array.isArray(doc.deliverables) ? doc.deliverables : [doc.deliverables]).map(String) } : {}),
           private: tagPrivate,
           // 「我的工作流」按创建/修改时间倒序展示（#92：列表顺序不可预期）
           mtime: statSync(full).mtimeMs,

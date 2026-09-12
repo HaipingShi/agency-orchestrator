@@ -183,7 +183,7 @@ function InputsDialog({ wf, provider, onClose, onRun, onCompare }: { wf: Workflo
   };
   const submit = () => {
     rememberMedia();
-    onRun({ kind: "workflow", title: wf.name, file: wf.file, inputs: vals, provider: provider || undefined, cast: wf.steps, materialize });
+    onRun({ kind: "workflow", title: wf.name, file: wf.file, inputs: vals, provider: provider || undefined, cast: wf.steps, deliverables: wf.deliverables, materialize });
     onClose();
   };
   const compare = () => {
@@ -507,7 +507,7 @@ export function WorkflowsPanel({ provider, onRun, demo, onInstallPrompt, filter 
     if (demo) return onInstallPrompt?.();
     track("workflow_run", { file: w.filename });
     if (w.inputs && w.inputs.length) setInputsFor(w);
-    else onRun({ kind: "workflow", title: w.name, file: w.file, provider: provider || undefined, cast: w.steps });
+    else onRun({ kind: "workflow", title: w.name, file: w.file, provider: provider || undefined, cast: w.steps, deliverables: w.deliverables });
   };
 
   // 对比单次基线：需引擎，demo 引导安装；有输入先填，再开对比视图

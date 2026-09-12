@@ -47,6 +47,18 @@ test('解析输入定义', () => {
   assert(wf.inputs![0].required === true, '应为必填');
 });
 
+test('解析顶层 deliverables（交付物步骤）', () => {
+  const wf = parseWorkflow(resolve(import.meta.dirname!, '../workflows/story-creation.yaml'));
+  assert(Array.isArray(wf.deliverables) && wf.deliverables.join() === 'final_story', `story-creation 应声明 deliverables=[final_story]，实际: ${JSON.stringify(wf.deliverables)}`);
+  assert(validateWorkflow(wf).length === 0, '声明的交付物是真实步骤 → 校验通过');
+  const bad = { ...wf, deliverables: ['nope'] };
+  assert(validateWorkflow(bad).some(e => e.includes('deliverables') && e.includes('nope')), '引用不存在的步骤 → 报错点名 id');
+  const empty = { ...wf, deliverables: [] as string[] };
+  assert(validateWorkflow(empty).some(e => e.includes('deliverables')), '空列表 → 报错（不写才是默认最后一步）');
+  const none = parseWorkflow(workflowPath);
+  assert(none.deliverables === undefined, '没写 deliverables 的模板解析为 undefined（走旧口径）');
+});
+
 test('解析步骤依赖', () => {
   const wf = parseWorkflow(workflowPath);
   const techReview = wf.steps.find(s => s.id === 'tech_review')!;

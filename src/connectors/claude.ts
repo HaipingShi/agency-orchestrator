@@ -63,40 +63,57 @@ export class ClaudeConnector implements LLMConnector {
     // executor 传入的 config.timeout 是 ms（每次重试会递增）。SDK 默认仅 10min，会无视该配置；
     // 这里把它作为单请求 timeout 传给 SDK。timeout=0/未设（不限时）→ 不传，退回 SDK 默认。
     const requestTimeout = config.timeout && config.timeout > 0 ? config.timeout : undefined;
-    const response = await this.client.messages.create(
-      {
-        // 供应商专有参数（如 thinking 预算）铺底，核心字段随后覆盖
-        ...(config.params ?? {}),
-        model: config.model!,
-        max_tokens: config.max_tokens || 4096,
-        ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
-        system: systemPrompt,
-        // 带图片输入时拆成 Anthropic 原生 image 块（base64 source）
-        messages: [
-          { role: 'user', content: (() => {
-            const { text, images } = splitVisionMessage(userMessage);
-            if (!images.length) return userMessage;
-            return [
-              ...images.map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.mime as 'image/png', data: im.base64 } })),
-              { type: 'text' as const, text },
-            ];
-          })() },
-        ],
-      },
-      requestTimeout !== undefined ? { timeout: requestTimeout } : undefined,
-    );
+    // 带图片输入时拆成 Anthropic 原生 image 块（base64 source）
+    const firstUser: Anthropic.MessageParam = { role: 'user', content: (() => {
+      const { text, images } = splitVisionMessage(userMessage);
+      if (!images.length) return userMessage;
+      return [
+        ...images.map((im) => ({ type: 'image' as const, source: { type: 'base64' as const, media_type: im.mime as 'image/png', data: im.base64 } })),
+        { type: 'text' as const, text },
+      ];
+    })() };
 
-    const content = response.content
-      .filter(block => block.type === 'text')
-      .map(block => block.type === 'text' ? block.text : '')
-      .join('\n');
+    // 命中 max_tokens（stop_reason=max_tokens）→ 自动续写，与 openai-compatible 同一口径（最多 3 次）。
+    // 没有这一段时，3000 字以上的成稿在 2048 上限下会被**静默截断**、还被当作完成传给下游。
+    const maxContinuations = 3;
+    let fullContent = '';
+    const usage = { input_tokens: 0, output_tokens: 0 };
+    for (let continuation = 0; continuation <= maxContinuations; continuation++) {
+      const messages: Anthropic.MessageParam[] = [firstUser];
+      if (continuation > 0 && fullContent) {
+        messages.push(
+          { role: 'assistant', content: fullContent },
+          { role: 'user', content: '你的回答被中断了，请从中断处继续写完，不要重复已写的内容。' },
+        );
+      }
+      const response = await this.client.messages.create(
+        {
+          // 供应商专有参数（如 thinking 预算）铺底，核心字段随后覆盖
+          ...(config.params ?? {}),
+          model: config.model!,
+          max_tokens: config.max_tokens || 4096,
+          ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
+          system: systemPrompt,
+          messages,
+        },
+        requestTimeout !== undefined ? { timeout: requestTimeout } : undefined,
+      );
 
-    return {
-      content,
-      usage: {
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-      },
-    };
+      const piece = response.content
+        .filter(block => block.type === 'text')
+        .map(block => block.type === 'text' ? block.text : '')
+        .join('\n');
+      fullContent += piece;
+      usage.input_tokens += response.usage.input_tokens;
+      usage.output_tokens += response.usage.output_tokens;
+
+      if (response.stop_reason === 'max_tokens' && piece.trim() && continuation < maxContinuations) {
+        process.stderr.write(`  🔄 输出达 max_tokens 上限，自动续写 (${continuation + 1}/${maxContinuations})，已累计 ${fullContent.length} 字符...\n`);
+        continue;
+      }
+      break;
+    }
+
+    return { content: fullContent, usage };
   }
 }

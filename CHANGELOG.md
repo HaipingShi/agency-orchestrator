@@ -4,6 +4,24 @@
 
 ## [Unreleased]
 
+### Added
+- **工作流顶层 `deliverables: [step_id, …]`（交付物步骤）**。多步工作流里前几步往往是施工图（大纲 / 人设 /
+  审读意见），只有最后一两步是用户要拿走的；此前 `--export docx`、Studio「导出 / 复制 / 下载 .md」把全部
+  步骤按顺序拼进去，小说的 Word 前大半是创作笔记、正文排在最后。现在声明了就只取交付物：CLI `--export`、
+  Studio 实时运行页（导出菜单里可切「含全部步骤」）、历史页「复制 / 下载结果」、`summary.md` 的 ⭐、
+  `--compare` 盲评取的成品，同一份口径（`deliverableSteps`）。没写 = 旧口径（最后一个完成步），写错 id 校验期报错。
+- **Claude API 连接器 max_tokens 自动续写**。`stop_reason=max_tokens` 时带着已写内容再请求（最多 3 次），
+  与 OpenAI 兼容连接器同一口径；此前 Claude 直连 / Anthropic 协议中转下 3000 字以上的成稿会被**静默截断**
+  还当作完成传给下游。`test/claude-continuation.ts` 10 条。
+
+### Changed
+- **「短篇小说创作」模板重写**（4 步 → 5 步）：结构步只出节拍表、明令不写成品句子（旧版"冲突场景"步已把
+  对白和高潮段落写成了，执笔步只是照抄拼接）；人物步改为串行读结构（旧版与场景步并行、互相看不见，
+  名字性格靠运气对上）；新增责任编辑审读（位置 → 问题 → 具体改法，最多 6 条 + 保留清单）与按意见定稿两步；
+  两个成稿步挂 `acceptance` + `assert.min_bytes`；`max_tokens` 2048 → 8192；输入加 `label` / `options`
+  （Studio 里风格、字数变下拉）；每步明令不输出"需要的话我可以…"（旧版把 Claude Code 的后续提议当素材传给了下游）；
+  声明 `deliverables: [final_story]`。真跑 5 分钟 / 15k token，责编 6 条意见定稿全部落实。
+
 ## [0.19.2] - 2026-09-02
 
 ### Added

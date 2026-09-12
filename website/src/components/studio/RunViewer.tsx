@@ -34,13 +34,26 @@ export function RunViewer({ onViewHistory, onGoProviders }: { onViewHistory?: ()
     }
   }, [contentLen, running, showTerminal]);
 
+  // 模板声明了 deliverables（交付物步骤）时，复制/下载/导出默认只带成稿——
+  // 小说的大纲、人设、审读意见是施工图，不该排在正文前面进 Word。菜单里可切回"含全部步骤"。
+  const deliverableSteps = useMemo(() => {
+    const declared = run?.source?.deliverables;
+    return run && declared?.length ? run.steps.filter((s) => declared.includes(s.id) && s.content.trim()) : [];
+  }, [run]);
+  const hasDeliverable = deliverableSteps.length > 0;
+  const [exportAll, setExportAll] = useState(false);
   const fullText = useMemo(() => {
     if (!run) return "";
+    if (hasDeliverable && !exportAll) {
+      return deliverableSteps.length === 1
+        ? deliverableSteps[0].content.trim()
+        : deliverableSteps.map((s) => `## ${s.name ?? s.id}\n\n${s.content.trim()}`).join("\n\n---\n\n");
+    }
     return run.steps
       .filter((s) => s.content.trim())
       .map((s) => (run.kind === "role" ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`))
       .join("\n\n---\n\n");
-  }, [run]);
+  }, [run, hasDeliverable, exportAll, deliverableSteps]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -230,6 +243,25 @@ export function RunViewer({ onViewHistory, onGoProviders }: { onViewHistory?: ()
                   </Button>
                   {exportOpen && (
                     <div className="absolute bottom-full right-0 z-10 mb-1 min-w-44 rounded-xl border border-border/60 bg-background/95 p-1.5 shadow-lg backdrop-blur-xl">
+                      {/* 声明了交付物的模板：导出范围二选一，默认只含成稿；同一开关也管「复制」「下载 .md」 */}
+                      {hasDeliverable && (
+                        <div className="mb-1 border-b border-border/50 pb-1">
+                          {([false, true] as const).map((all) => (
+                            <button
+                              key={String(all)}
+                              type="button"
+                              onClick={() => setExportAll(all)}
+                              className={cn(
+                                "flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted",
+                                exportAll === all ? "text-foreground" : "text-muted-foreground",
+                              )}
+                            >
+                              <span className={cn("size-1.5 rounded-full", exportAll === all ? "bg-primary" : "bg-border")} />
+                              {all ? t.studio.run.exportScopeAll : t.studio.run.exportScopeDeliverable}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {EXPORTS.map((e, i) => (
                         <div key={e.fmt}>
                           {i === 3 && <div className="my-1 border-t border-border/50" />}
