@@ -9,7 +9,7 @@
   审读意见），只有最后一两步是用户要拿走的；此前 `--export docx`、Studio「导出 / 复制 / 下载 .md」把全部
   步骤按顺序拼进去，小说的 Word 前大半是创作笔记、正文排在最后。现在声明了就只取交付物：CLI `--export`、
   Studio 实时运行页（导出菜单里可切「含全部步骤」）、历史页「复制 / 下载结果」、`summary.md` 的 ⭐、
-  `--compare` 盲评取的成品，同一份口径（`deliverableSteps`）。没写 = 旧口径（最后一个完成步），写错 id 校验期报错。
+  `--compare` 盲评取的成品、MCP `run_workflow` 的返回、`--notify` 推送节选，同一份口径（`deliverableSteps`）。没写 = 旧口径（最后一个完成步），写错 id 校验期报错。
 - **Claude API 连接器 max_tokens 自动续写**。`stop_reason=max_tokens` 时带着已写内容再请求（最多 3 次），
   与 OpenAI 兼容连接器同一口径；此前 Claude 直连 / Anthropic 协议中转下 3000 字以上的成稿会被**静默截断**
   还当作完成传给下游。`test/claude-continuation.ts` 10 条。

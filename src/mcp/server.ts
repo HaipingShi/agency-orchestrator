@@ -15,7 +15,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import * as yaml from 'js-yaml';
 
-import { run } from '../index.js';
+import { run, finalOutput } from '../index.js';
 import { parseWorkflow, validateWorkflow } from '../core/parser.js';
 import { buildDAG, formatDAG } from '../core/dag.js';
 import { listAgents } from '../agents/loader.js';
@@ -139,8 +139,8 @@ export async function startServer(verbose = false): Promise<void> {
           }),
         );
 
-        const lastStep = result.steps[result.steps.length - 1];
-        const output = lastStep?.output || '(no output)';
+        // 交付物口径与 CLI 导出 / summary ⭐ 一致：声明了 deliverables 取声明的，否则最后一个完成步
+        const output = finalOutput(result) || '(no output)';
         const tokenSummary = `Tokens: ${result.totalTokens.input} in / ${result.totalTokens.output} out`;
 
         return {

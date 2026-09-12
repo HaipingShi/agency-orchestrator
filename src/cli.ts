@@ -319,13 +319,15 @@ async function handleRun(): Promise<void> {
  * 三个出口（正常 / --compare / run 抛错）都要经过这里——漏一个出口就是 cron 用户的静默丢通知。
  */
 async function maybeNotifyRun(
-  result: Pick<import('./types.js').WorkflowResult, 'name' | 'success' | 'steps' | 'totalDuration'>,
+  result: Pick<import('./types.js').WorkflowResult, 'name' | 'success' | 'steps' | 'totalDuration' | 'deliverables'>,
   excerptOverride?: string,
 ): Promise<void> {
   const notifyUrl = getArgValue('--notify') || process.env.AO_NOTIFY_URL;
   if (!notifyUrl) return;
   const { sendNotify } = await import('./notify.js');
-  const finalStep = [...result.steps].reverse().find((s) => s.status === 'completed' && s.output);
+  // 推送里的节选取交付物（声明了 deliverables 就是它，否则最后一个完成步），与导出 / summary ⭐ 同一口径
+  const { deliverableSteps } = await import('./types.js');
+  const finalStep = deliverableSteps(result).at(-1);
   const r = await sendNotify(notifyUrl, {
     name: result.name,
     success: result.success,

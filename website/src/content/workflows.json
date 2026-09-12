@@ -117,7 +117,7 @@
       "steps": [
         {
           "id": "ceo_kickoff",
-          "role": "specialized/business-strategist",
+          "role": "company/chief-executive-officer",
           "name": "老板",
           "emoji": "👔"
         },
@@ -165,7 +165,7 @@
         },
         {
           "id": "ceo_decision",
-          "role": "specialized/business-strategist",
+          "role": "company/chief-executive-officer",
           "name": "老板",
           "emoji": "👔"
         }
@@ -318,6 +318,40 @@
       ]
     },
     {
+      "name": "短篇小说创作",
+      "description": "从创意到定稿：叙事学家定结构与节拍 → 心理学家塑造人物 → 作者成稿 → 责任编辑审读 → 作者按意见定稿。每步只交自己那份活，成稿不再照抄中间稿。",
+      "steps": [
+        {
+          "id": "story_structure",
+          "role": "academic/academic-narratologist",
+          "name": "叙事学家"
+        },
+        {
+          "id": "character_design",
+          "role": "academic/academic-psychologist",
+          "name": "人物设计"
+        },
+        {
+          "id": "write_story",
+          "role": "marketing/marketing-content-creator",
+          "name": "执笔作者",
+          "emoji": "🖋"
+        },
+        {
+          "id": "editor_review",
+          "role": "academic/academic-narratologist",
+          "name": "责任编辑",
+          "emoji": "🧐"
+        },
+        {
+          "id": "final_story",
+          "role": "marketing/marketing-content-creator",
+          "name": "执笔作者 · 定稿",
+          "emoji": "🖋"
+        }
+      ]
+    },
+    {
       "name": "会议纪要整理",
       "description": "输入原始会议记录，自动整理为结构化纪要：决策、TODO、争议点 三视角并行 → 完整纪要",
       "steps": [
@@ -387,7 +421,7 @@
       "steps": [
         {
           "id": "ceo_brief",
-          "role": "specialized/business-strategist",
+          "role": "company/chief-executive-officer",
           "name": "老板",
           "emoji": "👔"
         },
@@ -411,7 +445,7 @@
         },
         {
           "id": "launch_pack",
-          "role": "specialized/business-strategist",
+          "role": "company/chief-executive-officer",
           "name": "老板",
           "emoji": "👔"
         }
@@ -425,7 +459,7 @@
       "steps": [
         {
           "id": "ceo_position",
-          "role": "specialized/business-strategist",
+          "role": "company/chief-executive-officer",
           "name": "老板",
           "emoji": "👔"
         },
@@ -530,28 +564,6 @@
           "role": "marketing/marketing-content-creator",
           "name": "整合导演",
           "emoji": "🎥"
-        }
-      ]
-    },
-    {
-      "name": "短篇小说创作",
-      "description": "从创意到成稿：叙事学家设计结构 → 心理学家塑造人物 + 叙事设计师构建冲突 → 内容创作者执笔成稿",
-      "steps": [
-        {
-          "id": "story_structure",
-          "role": "academic/academic-narratologist"
-        },
-        {
-          "id": "character_design",
-          "role": "academic/academic-psychologist"
-        },
-        {
-          "id": "conflict_design",
-          "role": "game-development/narrative-designer"
-        },
-        {
-          "id": "write_story",
-          "role": "marketing/marketing-content-creator"
         }
       ]
     },
@@ -811,13 +823,13 @@
       "steps": [
         {
           "id": "shot_prompt",
-          "role": "design/design-image-prompt-engineer",
+          "role": "design/design-video-prompt-engineer",
           "name": "提示词工程师",
           "emoji": "🎬"
         },
         {
           "id": "negative",
-          "role": "design/design-image-prompt-engineer",
+          "role": "design/design-video-prompt-engineer",
           "name": "反穿帮清单",
           "emoji": "🚫"
         },
@@ -829,7 +841,7 @@
         },
         {
           "id": "pack",
-          "role": "design/design-image-prompt-engineer",
+          "role": "design/design-video-prompt-engineer",
           "name": "成片交付",
           "emoji": "📦"
         }
