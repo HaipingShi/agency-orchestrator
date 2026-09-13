@@ -123,6 +123,28 @@ test('汇总之后的提示行（💡 从失败处继续 / 命令）不挂到任
   assert(after.length === 0, `汇总后还有正文事件：${JSON.stringify(after.slice(0, 3))}`);
 });
 
+// ── 验收未过的条目：中文 "验收 ⚠️" 与英文 "Acceptance ⚠️" 两种（英文模板真跑时 reporter 打的是后者）
+for (const [label, agentName, result] of [
+  ['中文', '执笔作者', '她把伞塞进少年手里。'],
+  ['English', 'Writer', 'She pressed the umbrella into his hands.'],
+] as const) {
+  test(`验收未过（${label}）：⚠️ 条目发 step-verify-item，不进正文；正文照常`, () => {
+    const text = capture(() => {
+      printStepResult(node({
+        id: 'w', agentName, result,
+        verification: { pass: false, failed: ['条目一 / criterion one', '条目二 / criterion two'], reworked: true },
+      }), 1, 1);
+    });
+    assert(label === '中文' ? /验收 ⚠️/.test(text) : /Acceptance ⚠️ 2 unmet/.test(text), `reporter 没按预期语言打验收行：${text.slice(0, 200)}`);
+    const e = parseAll(text);
+    const items = e.filter((x) => x.type === 'step-verify-item').map((x) => x.data.text);
+    assert(items.length === 2 && items[0].startsWith('条目一'), `应识别 2 条未满足条目，实际 ${JSON.stringify(items)}`);
+    const body = e.filter((x) => x.type === 'step-content').map((x) => x.data.text).join('\n');
+    assert(!/条目一|criterion/.test(body), `未满足条目混进了正文：${body}`);
+    assert(body.includes(result), '正文丢了');
+  });
+}
+
 // ── 全部成功的运行
 test('全部成功：workflow-summary ok=true，没有 step-failed', () => {
   const okRun = capture(() => {

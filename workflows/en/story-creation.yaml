@@ -1,0 +1,191 @@
+name: "Short Story"
+description: "Premise to final draft: narratologist builds the structure and beats → psychologist shapes the characters → writer drafts → editor reviews → writer revises. Each step does only its own job, so the final draft is written, not stitched."
+
+agents_dir: "agency-agents"
+
+llm:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  # Long drafts get cut off at 2048 (the Claude API connector continues automatically now, but keep headroom);
+  # assert below is the truncation guard
+  max_tokens: 8192
+  timeout: 300000
+  retry: 2
+
+concurrency: 2
+
+# Only the final draft is the deliverable: export / Studio copy & download / --compare judging take this step.
+# Structure, characters and editor notes are scaffolding — they stay in the run folder.
+deliverables: [final_story]
+
+inputs:
+  - name: premise
+    label: "Premise"
+    description: "A one-line pitch, a theme, or the single moment you want to write"
+    required: true
+    default: "A watch repairer receives a pocket watch that always runs exactly seven minutes fast. The name on the repair slip is his father's, who vanished thirty years ago."
+  - name: style
+    label: "Genre / tone"
+    description: "Pick one or type your own (e.g. dark comedy, Southern Gothic, cyberpunk)"
+    required: false
+    options: ["Mystery", "Literary", "Sci-fi", "Absurdist", "Horror", "Romance", "Historical"]
+    default: "Mystery"
+  - name: length
+    label: "Length (words)"
+    description: "Target word count; above 5000 use the Novella (chapters) workflow instead"
+    required: false
+    options: ["800", "1500", "3000", "5000"]
+    default: "1500"
+
+steps:
+  # ── Structure + beat sheet (scaffolding only, no finished prose) ──
+  - id: story_structure
+    role: "academic/academic-narratologist"
+    name: "Narratologist"
+    task: |
+      Design the narrative structure and beat sheet for a {{style}} short story of about {{length}} words.
+
+      Premise: {{premise}}
+
+      Output (markdown):
+      1. **Core conflict**: one sentence
+      2. **Point of view**: person + POV character + reliable or unreliable narrator, and why this POV sharpens the conflict
+      3. **Techniques**: pick 1–2 (flashback / withholding / reversal / dual timeline / circular ending …) and say where each is used
+      4. **Beat sheet**: 5–8 numbered beats. Each beat is exactly four lines:
+         - What happens (one sentence, the event itself)
+         - Dramatic function (reveal / pressure / reversal / release)
+         - What the reader knows that the character doesn't (or the reverse)
+         - The hook at the end of the beat
+      5. **Ending**: open / closed / circular, and the final image (the image only, not a sentence)
+      6. **Theme**: one sentence — it must never be stated in the story
+
+      Hard rules:
+      - This is a blueprint for the writer, not the story. **Do not write any sentence or line of dialogue that could go straight into the story**; quotation marks inside the beats count as a violation.
+      - Output only the six sections above — no preamble, no "let me know if you'd like…" offers.
+    output: structure
+
+  # ── Characters (reads the structure, so names and arcs line up with the beats) ──
+  - id: character_design
+    role: "academic/academic-psychologist"
+    name: "Character Design"
+    task: |
+      Based on the structure below, design the main characters (2–3). Every beat in the beat sheet must be playable by these people.
+
+      {{structure}}
+
+      For each character (markdown):
+      ### Name (role, age)
+      - **In one line**: who this person is
+      - **Core want**: what they want and why now
+      - **Inner conflict**: what they fear or refuse to face — and how it fights the want
+      - **Voice**: sentence length, verbal tics or words they avoid, which topic makes them go quiet (the writer uses this for dialogue)
+      - **Signature detail**: one concrete physical detail or habit that can recur in the story
+      - **Arc**: from [starting state] → [end state], and at which beat the turn happens
+
+      Rules:
+      - Believable, not stock; secondary characters need their own motives, not just a function in the protagonist's story.
+      - Give every character a real name (unless the structure already names them) — no "he / the wife / the old man".
+      - Output only the character sheets: no scenes, no sample dialogue, no follow-up offers.
+    output: characters
+    depends_on: [story_structure]
+
+  # ── Draft ──
+  - id: write_story
+    role: "marketing/marketing-content-creator"
+    name: "Writer"
+    emoji: "🖋"
+    task: |
+      You are a fiction writer here, not a copywriter. Using the blueprint below, write a {{style}} short story of about {{length}} words.
+
+      ## Structure and beat sheet
+      {{structure}}
+
+      ## Characters
+      {{characters}}
+
+      Requirements:
+      - Output the story text only: no title, no "Here is…", no author's notes before or after
+      - Follow the beat sheet, but turn every beat into a scene with setting, action and sensory detail
+      - Open inside a concrete image or action — not background, weather or a character résumé
+      - Dialogue sounds spoken; use each character's "Voice" to tell them apart; characters never explain to each other what they both already know
+      - Concrete sounds, smells, textures and objects instead of stacked adjectives; each character's signature detail appears at least twice
+      - Short sentences for tension, longer ones to slow down; show emotion through action and objects, never "she felt…"
+      - The theme may only emerge through events and images — no character ever says it
+      - End on the final image: no explanation, no uplift, no summary
+    acceptance: |
+      1. The output is the story itself: no title, no "Here is" preamble, no writing notes or afterword
+      2. The story is within ±30% of {{length}} words
+      3. The first paragraph is a concrete image or action, not background exposition
+      4. There is at least one exchange of dialogue, and the characters' voices are distinguishable
+      5. It ends on an image, without explaining the mystery or stating the theme
+    assert:
+      # Truncation guard. min_chars counts non-whitespace characters, not words — English averages ~4.5 per word,
+      # so {{length}} × 3 is a lenient floor (≈ 70% of target) and × 8 a generous ceiling (≈ 170%).
+      min_chars: "{{length}} * 3"
+      max_chars: "{{length}} * 8"
+    output: draft
+    depends_on: [character_design]
+
+  # ── Editorial review (notes only, no rewriting) ──
+  - id: editor_review
+    role: "academic/academic-narratologist"
+    name: "Editor"
+    emoji: "🧐"
+    task: |
+      You are this story's editor. Read the draft against the blueprint and give the writer revision notes.
+
+      ## Blueprint
+      {{structure}}
+
+      ## Characters
+      {{characters}}
+
+      ## Draft
+      {{draft}}
+
+      Review, in priority order:
+      1. Did every beat land? Which beat is thin, skipped or diluted
+      2. Are the characters on model: voice, signature detail, where the arc turns
+      3. Where is the draft telling instead of showing (stated emotions, characters explaining known facts, the theme said out loud)
+      4. Does the opening get into the image fast enough; does the ending over-explain by one sentence
+      5. Language: clichés, repeated sentence shapes, adjectives that can go
+
+      Output format:
+      - At most 6 notes, ordered by impact on the final story
+      - One line each: **Where** (quote ≤ 15 words) → **Problem** → **Concrete fix** (what it should become, not "polish this")
+      - Last line: **Keep**: 2–3 passages that work and must not be touched in revision
+      - Do not rewrite the story, do not score it, no pleasantries, no follow-up offers
+    output: editor_notes
+    depends_on: [write_story]
+
+  # ── Final draft ──
+  - id: final_story
+    role: "marketing/marketing-content-creator"
+    name: "Writer · Final"
+    emoji: "🖋"
+    task: |
+      You are the author of this story. Your editor has sent notes. Revise the draft and deliver the final version.
+
+      ## Draft
+      {{draft}}
+
+      ## Editor's notes
+      {{editor_notes}}
+
+      Revision rules:
+      - Address every note; do not touch anything on the "Keep" list
+      - This is a revision, not a rewrite: paragraphs no note points at stay as they are — don't swap out good sentences
+      - Keep it at about {{length}} words
+      - Output the final story only: no title, no revision notes, no list of what you changed
+    # The reviewer only sees this step's output — not the notes or the draft — so "every note was addressed"
+    # can't be checked here and would be rubber-stamped. Keep criteria checkable from the story alone.
+    acceptance: |
+      1. The output is the story itself: no title, no revision notes, no "Here is the final version" preamble
+      2. The story is within ±30% of {{length}} words
+      3. The first paragraph is a concrete image or action, not background exposition
+      4. It ends on an image, without explaining the mystery or stating the theme
+    assert:
+      min_chars: "{{length}} * 3"
+      max_chars: "{{length}} * 8"
+    output: story
+    depends_on: [editor_review]

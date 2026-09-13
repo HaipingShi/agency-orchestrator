@@ -30,7 +30,8 @@ export function StepList({
         const failedStep = s.status === "failed";
         const skipped = s.status === "skipped";
         // CLI 结果行形如 "33.1s | 345 tokens | 验收 ✓"——把验收段拆出来做成彩色徽章
-        const verifMatch = s.meta?.match(/^(.*?)(?:\s*\|\s*)?(验收\s*[✓⚠️].*)$/);
+        // 英文步骤是 "Acceptance ✓" / "Acceptance ⚠️ 2 unmet"（reporter.formatVerification），两种都要认
+        const verifMatch = s.meta?.match(/^(.*?)(?:\s*\|\s*)?((?:验收|Acceptance)\s*[✓⚠️].*)$/);
         const baseMeta = verifMatch ? verifMatch[1] : s.meta;
         const verifText = verifMatch?.[2];
         const verifPass = verifText?.includes("✓");

@@ -111,7 +111,9 @@ export function createRunOutputParser({ send, runId, resolveOutputDir = (p) => p
     // currentStepId set here — clearing it would drop the whole step body.
     const metaMatch = clean.match(/^完成\s*\|\s*(.+)/);
     if (metaMatch && currentStepId) {
-      inVerifyItems = /验收\s*⚠️/.test(metaMatch[1]);
+      // reporter.formatVerification 对英文步骤打的是 "Acceptance ⚠️ 2 unmet"——只认中文"验收"时，
+      // 英文模板的未满足条目会整段掉进正文
+      inVerifyItems = /(?:验收|Acceptance)\s*⚠️/.test(metaMatch[1]);
       send('step-done', { id: currentStepId, meta: metaMatch[1] });
       return;
     }

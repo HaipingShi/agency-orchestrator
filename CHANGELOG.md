@@ -24,6 +24,10 @@
   `deliverables` = 五章正文，每章第一行自带 `## 第N章 章名`，导出即按序拼成书稿（导出时产出自带标题
   就不再套步骤名标题）；字数用 `min_chars/max_chars: "{{chapter_length}} * 0.7 / 1.5"`。引擎 `loop`
   每轮覆盖同一输出变量、上限 10 轮，攒不起章节，所以章数写死为五。
+- **英文站小说模板**：`workflows/en/story-creation.yaml`（Short Story）与 `workflows/en/novel-chapters.yaml`（Novella in
+  Chapters），英文 Studio 此前看不到任何小说模板。不是逐句翻译：字数按 **words** 给，`min_chars / max_chars` 数的是
+  非空白字符，英文约 4.5 字符 / 词，所以写成 `"{{length}} * 3"`（≈ 目标 70%）/ `* 8`（≈ 170%）并在 YAML 里注明；
+  章标题用 `## Chapter N: Title`；审校多一条"大纲自身的矛盾要指出并给出正文该怎么处理"（中文版真跑时审校自己挑出过这类问题）。
 
 ### Changed
 - **「短篇小说创作」模板重写**（4 步 → 5 步）：结构步只出节拍表、明令不写成品句子（旧版"冲突场景"步已把
@@ -51,6 +55,9 @@
   "⏭️ 跳过 N 步: b, c" 出现一次，以前它们在 Studio 里永远停在"待运行"。
   `test/run-output-parser.ts` 9 条，**用真 reporter 的 printStepResult / printSummary 打出来的文本喂解析器**，
   打印格式一漂移当场红。
+- **英文运行的验收结果在 Studio 里认不出**：reporter 对英文步骤打的是 `Acceptance ✓` / `Acceptance ⚠️ 2 unmet`，
+  解析器和步骤徽章只认中文「验收」——未满足条目整段掉进步骤正文、彩色徽章不出现。加英文模板时真跑撞见。
+  两处都认两种写法；`test/run-output-parser.ts` +2 条（中 / 英各一），拿修复前的解析器跑同一套测试英文那条确实红。
 
 ## [0.19.2] - 2026-09-02
 

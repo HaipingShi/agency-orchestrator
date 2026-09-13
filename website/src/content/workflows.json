@@ -1015,6 +1015,83 @@
   ],
   "en": [
     {
+      "name": "Novella in Chapters",
+      "description": "Five fixed chapters: narratologist writes the book outline and foreshadowing list → psychologist writes the character bible → each chapter is drafted with the outline, characters, the previous chapter in full and a running fact ledger → the ledger is updated after every chapter → a continuity review of the whole book. The deliverable is the five chapters, so export gives you a manuscript.",
+      "category": "内容创作",
+      "steps": [
+        {
+          "id": "outline",
+          "role": "academic/academic-narratologist",
+          "name": "Narratologist · Outline"
+        },
+        {
+          "id": "bible",
+          "role": "academic/academic-psychologist",
+          "name": "Psychologist · Character Bible"
+        },
+        {
+          "id": "ch1",
+          "role": "marketing/marketing-content-creator",
+          "name": "Chapter 1",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger1",
+          "role": "academic/academic-narratologist",
+          "name": "Ledger · after Ch. 1",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch2",
+          "role": "marketing/marketing-content-creator",
+          "name": "Chapter 2",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger2",
+          "role": "academic/academic-narratologist",
+          "name": "Ledger · after Ch. 2",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch3",
+          "role": "marketing/marketing-content-creator",
+          "name": "Chapter 3",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger3",
+          "role": "academic/academic-narratologist",
+          "name": "Ledger · after Ch. 3",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch4",
+          "role": "marketing/marketing-content-creator",
+          "name": "Chapter 4",
+          "emoji": "🖋"
+        },
+        {
+          "id": "ledger4",
+          "role": "academic/academic-narratologist",
+          "name": "Ledger · after Ch. 4",
+          "emoji": "📒"
+        },
+        {
+          "id": "ch5",
+          "role": "marketing/marketing-content-creator",
+          "name": "Chapter 5",
+          "emoji": "🖋"
+        },
+        {
+          "id": "review",
+          "role": "academic/academic-narratologist",
+          "name": "Continuity Review",
+          "emoji": "🧐"
+        }
+      ]
+    },
+    {
       "name": "Solo Founder All-Hands",
       "description": "One sentence in, 8 AI 'departments' collaborate, full launch plan out in 2 minutes — your one-person company",
       "steps": [
@@ -1071,6 +1148,40 @@
           "role": "company/chief-executive-officer",
           "name": "CEO",
           "emoji": "👔"
+        }
+      ]
+    },
+    {
+      "name": "Short Story",
+      "description": "Premise to final draft: narratologist builds the structure and beats → psychologist shapes the characters → writer drafts → editor reviews → writer revises. Each step does only its own job, so the final draft is written, not stitched.",
+      "steps": [
+        {
+          "id": "story_structure",
+          "role": "academic/academic-narratologist",
+          "name": "Narratologist"
+        },
+        {
+          "id": "character_design",
+          "role": "academic/academic-psychologist",
+          "name": "Character Design"
+        },
+        {
+          "id": "write_story",
+          "role": "marketing/marketing-content-creator",
+          "name": "Writer",
+          "emoji": "🖋"
+        },
+        {
+          "id": "editor_review",
+          "role": "academic/academic-narratologist",
+          "name": "Editor",
+          "emoji": "🧐"
+        },
+        {
+          "id": "final_story",
+          "role": "marketing/marketing-content-creator",
+          "name": "Writer · Final",
+          "emoji": "🖋"
         }
       ]
     },

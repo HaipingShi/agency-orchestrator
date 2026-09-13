@@ -1,0 +1,424 @@
+name: "Novella in Chapters"
+description: "Five fixed chapters: narratologist writes the book outline and foreshadowing list → psychologist writes the character bible → each chapter is drafted with the outline, characters, the previous chapter in full and a running fact ledger → the ledger is updated after every chapter → a continuity review of the whole book. The deliverable is the five chapters, so export gives you a manuscript."
+category: "内容创作"
+
+agents_dir: "agency-agents"
+
+llm:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  max_tokens: 8192
+  timeout: 300000
+  retry: 2
+
+concurrency: 2
+
+# Deliverable = the five chapters (each starts with its own "## Chapter N: Title", so export stitches a manuscript).
+# Outline / bible / ledgers / review are scaffolding: they stay in the run folder and can be reworked with --feedback.
+deliverables: [ch1, ch2, ch3, ch4, ch5]
+
+inputs:
+  - name: premise
+    label: "Premise"
+    description: "A one-line pitch, a theme, or the world you want to write"
+    required: true
+    default: "A month before she retires, a coastal customs officer finds that the captain of the boat she let slip away thirty years ago is now the philanthropist funding the town's new harbor."
+  - name: style
+    label: "Genre / tone"
+    description: "Pick one or type your own"
+    required: false
+    options: ["Literary", "Mystery", "Sci-fi", "Historical", "Horror", "Romance", "Absurdist"]
+    default: "Literary"
+  - name: chapter_length
+    label: "Words per chapter"
+    description: "The book is about five times this; 3000 words/chapter ≈ a 15,000-word novella"
+    required: false
+    options: ["1200", "2000", "3000"]
+    default: "2000"
+  - name: setting
+    label: "Existing canon (optional)"
+    description: "Characters, world rules, taboos or plot points that must appear; leave empty if none"
+    required: false
+    default: ""
+
+steps:
+  # ── Book outline + foreshadowing list (scaffolding, no finished prose) ──
+  - id: outline
+    role: "academic/academic-narratologist"
+    name: "Narratologist · Outline"
+    task: |
+      Design the outline for a five-chapter {{style}} novella of about {{chapter_length}} words per chapter.
+
+      Premise: {{premise}}
+      Existing canon: {{setting}}
+
+      Output (markdown):
+      1. **The story in one sentence**: protagonist + want + obstacle + cost
+      2. **Point of view and tense**: person, POV character, reliable or not, and why
+      3. **Book shape**: what each of the five chapters carries (setup / escalation / midpoint reversal / collapse / resolution), one sentence each
+      4. **Chapter outline**: one section per chapter, always in this format:
+         ### Chapter N: Title
+         - Goal (what the reader should know / fear by the end of this chapter)
+         - Events (3–5, in order, only what happens)
+         - Turn (the biggest change in this chapter)
+         - End hook (the unresolved state or image the chapter stops on)
+      5. **Foreshadowing list**: a table with three columns — setup / planted in chapter / paid off in chapter. At least 4 rows; every setup must pay off
+      6. **Theme**: one sentence — never stated in the text
+
+      Hard rules:
+      - This is a blueprint, not the book. **Do not write any sentence or line of dialogue that could go straight into the text**; quotation marks count as a violation.
+      - Output only the six sections — no preamble, no "let me know if…" offers.
+    output: outline
+
+  # ── Character bible ──
+  - id: bible
+    role: "academic/academic-psychologist"
+    name: "Psychologist · Character Bible"
+    task: |
+      Based on the outline, write the character bible (3–5 characters). They must be able to carry every event and turn in the outline.
+
+      {{outline}}
+
+      For each character (markdown):
+      ### Name (role, age)
+      - **In one line**: who this person is
+      - **Core want**: what they want and why now
+      - **Inner conflict**: what they fear or refuse to face — and how it fights the want
+      - **Voice**: sentence length, verbal tics or words they avoid, which topic makes them go quiet
+      - **Signature detail**: one concrete physical detail or habit that recurs across the book
+      - **Chapter by chapter**: chapter 1 → chapter 5, one line each: where they are, what they believe, where they stand with the protagonist
+
+      Rules:
+      - Real names (unless the outline or canon already names them) — no "he / the wife / the old man".
+      - Secondary characters need their own motives, not just a function.
+      - Output only the bible: no scenes, no sample dialogue, no follow-up offers.
+    output: bible
+    depends_on: [outline]
+
+  # ── Chapter 1 ──
+  - id: ch1
+    role: "marketing/marketing-content-creator"
+    name: "Chapter 1"
+    emoji: "🖋"
+    task: |
+      You are the author of this novella. Following the outline, write **Chapter 1**, about {{chapter_length}} words, {{style}}.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      Requirements:
+      - The first line is the chapter title, exactly in the form `## Chapter 1: Title` (use the title from the outline). The prose follows directly — no notes, no afterword, no "Here is"
+      - Write only Chapter 1's events; don't run ahead. Plant this chapter's setups as the foreshadowing list says — naturally, without emphasis
+      - Open inside a concrete image or action, not background, weather or a character résumé
+      - Dialogue sounds spoken; use each character's "Voice"; characters never explain to each other what they both already know
+      - Concrete sounds, smells, textures and objects instead of stacked adjectives; the protagonist's signature detail appears at least twice
+      - Show emotion through action and objects, never "she felt…"
+      - Stop on the end hook from the outline: no summary, no preview of the next chapter, no uplift
+    acceptance: |
+      1. The first line is a "## Chapter 1: Title" heading and prose follows directly, with no notes, afterword or preamble
+      2. There is at least one exchange of dialogue, and the voices are distinguishable
+      3. The first paragraph is a concrete image or action, not background exposition
+      4. The chapter stops on an unresolved image or action — no summary, no preview of the next chapter
+      5. The text never refers to "the previous chapter", "this chapter" or "the next chapter"
+    assert:
+      # min_chars counts non-whitespace characters, not words (~4.5 per English word):
+      # × 3 ≈ 70% of the target word count, × 8 ≈ 170%
+      min_chars: "{{chapter_length}} * 3"
+      max_chars: "{{chapter_length}} * 8"
+    output: ch1
+    depends_on: [bible]
+
+  # ── Ledger: after every chapter the narratologist records what is now fixed, so the next chapter can pick it up ──
+  - id: ledger1
+    role: "academic/academic-narratologist"
+    name: "Ledger · after Ch. 1"
+    emoji: "📒"
+    task: |
+      You are the continuity editor. Having read Chapter 1, create the **fact ledger** the author of Chapter 2 will work from.
+
+      ## Book outline
+      {{outline}}
+
+      ## Chapter 1
+      {{ch1}}
+
+      Ledger format (markdown, short lines, under 600 words total):
+      1. **Established facts**: names, places, dates, objects, numbers — fixed in the text and not allowed to change later
+      2. **Where everyone stands now**: one line per character: where they are, what they know, what they believe, their relationship with the protagonist
+      3. **Foreshadowing ledger**: table — setup / planted (chapter, in what form) / to pay off (chapter)
+      4. **Final frame**: the last image / action / unresolved state of Chapter 1, quoting ≤ 25 words
+      5. **The next chapter must**: 2–4 items, stating clearly "must address / must not reveal yet"
+
+      Output only the ledger. No comments on the prose, no revision advice, no follow-up offers.
+    output: ledger1
+    depends_on: [ch1]
+
+  - id: ch2
+    role: "marketing/marketing-content-creator"
+    name: "Chapter 2"
+    emoji: "🖋"
+    task: |
+      You are the author of this novella. Following the outline, write **Chapter 2**, about {{chapter_length}} words, {{style}}.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      ## Fact ledger (as of the previous chapter) — the text must not contradict it
+      {{ledger1}}
+
+      ## Previous chapter in full (continue from its end state and tone)
+      {{ch1}}
+
+      Requirements:
+      - The first line is exactly `## Chapter 2: Title`. The prose follows directly — no notes, no afterword, no "Here is"
+      - Pick up from the ledger's "Final frame" and "The next chapter must"; do not recap what the previous chapter already showed
+      - Write only this chapter's events; plant or pay off setups as the foreshadowing ledger says
+      - Use each character's "Voice"; characters never explain to each other what they both already know
+      - Concrete sensory detail and objects instead of adjectives; emotion through action, never "he felt…"
+      - Stop on the end hook from the outline: no summary, no preview, no uplift
+    acceptance: |
+      1. The first line is a "## Chapter 2: Title" heading and prose follows directly, with no notes, afterword or preamble
+      2. There is at least one exchange of dialogue, and the voices are distinguishable
+      3. The opening does not recap events the previous chapter already showed
+      4. The chapter stops on an unresolved image or action — no summary, no preview of the next chapter
+      5. The text never refers to "the previous chapter", "this chapter" or "the next chapter"
+    assert:
+      min_chars: "{{chapter_length}} * 3"
+      max_chars: "{{chapter_length}} * 8"
+    output: ch2
+    depends_on: [ledger1]
+
+  - id: ledger2
+    role: "academic/academic-narratologist"
+    name: "Ledger · after Ch. 2"
+    emoji: "📒"
+    task: |
+      You are the continuity editor. Starting from the previous ledger, read Chapter 2 and update the **fact ledger**.
+
+      ## Book outline
+      {{outline}}
+
+      ## Previous ledger
+      {{ledger1}}
+
+      ## Chapter 2
+      {{ch2}}
+
+      Update rules: keep entries that still hold; add facts Chapter 2 establishes; move every character to where they stand at the end of Chapter 2;
+      mark setups planted / paid off in this chapter; replace "Final frame" and "The next chapter must" with Chapter 2's. Same format, under 800 words.
+      Output only the full updated ledger. No comments on the prose, no revision advice, no follow-up offers.
+    output: ledger2
+    depends_on: [ch2]
+
+  - id: ch3
+    role: "marketing/marketing-content-creator"
+    name: "Chapter 3"
+    emoji: "🖋"
+    task: |
+      You are the author of this novella. Following the outline, write **Chapter 3** (the midpoint reversal), about {{chapter_length}} words, {{style}}.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      ## Fact ledger (as of the previous chapter) — the text must not contradict it
+      {{ledger2}}
+
+      ## Previous chapter in full (continue from its end state and tone)
+      {{ch2}}
+
+      Requirements:
+      - The first line is exactly `## Chapter 3: Title`. The prose follows directly — no notes, no afterword, no "Here is"
+      - Pick up from the ledger's "Final frame" and "The next chapter must"; do not recap the previous chapter
+      - The reversal happens through events, not a character suddenly realizing; a reader looking back must find the setup
+      - Use each character's "Voice"; characters never explain to each other what they both already know
+      - Concrete sensory detail and objects instead of adjectives; emotion through action, never "he felt…"
+      - Stop on the end hook from the outline: no summary, no preview, no uplift
+    acceptance: |
+      1. The first line is a "## Chapter 3: Title" heading and prose follows directly, with no notes, afterword or preamble
+      2. There is at least one exchange of dialogue, and the voices are distinguishable
+      3. The opening does not recap events the previous chapter already showed
+      4. The chapter stops on an unresolved image or action — no summary, no preview of the next chapter
+      5. The text never refers to "the previous chapter", "this chapter" or "the next chapter"
+    assert:
+      min_chars: "{{chapter_length}} * 3"
+      max_chars: "{{chapter_length}} * 8"
+    output: ch3
+    depends_on: [ledger2]
+
+  - id: ledger3
+    role: "academic/academic-narratologist"
+    name: "Ledger · after Ch. 3"
+    emoji: "📒"
+    task: |
+      You are the continuity editor. Starting from the previous ledger, read Chapter 3 and update the **fact ledger**.
+
+      ## Book outline
+      {{outline}}
+
+      ## Previous ledger
+      {{ledger2}}
+
+      ## Chapter 3
+      {{ch3}}
+
+      Update rules: keep entries that still hold; add facts Chapter 3 establishes; move every character to where they stand at the end of Chapter 3;
+      mark setups planted / paid off in this chapter; replace "Final frame" and "The next chapter must" with Chapter 3's. Same format, under 800 words.
+      Output only the full updated ledger. No comments on the prose, no revision advice, no follow-up offers.
+    output: ledger3
+    depends_on: [ch3]
+
+  - id: ch4
+    role: "marketing/marketing-content-creator"
+    name: "Chapter 4"
+    emoji: "🖋"
+    task: |
+      You are the author of this novella. Following the outline, write **Chapter 4** (the collapse / low point), about {{chapter_length}} words, {{style}}.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      ## Fact ledger (as of the previous chapter) — the text must not contradict it
+      {{ledger3}}
+
+      ## Previous chapter in full (continue from its end state and tone)
+      {{ch3}}
+
+      Requirements:
+      - The first line is exactly `## Chapter 4: Title`. The prose follows directly — no notes, no afterword, no "Here is"
+      - Pick up from the ledger's "Final frame" and "The next chapter must"; do not recap the previous chapter
+      - Pay off most of the setups planted in chapters 1–3 (per the foreshadowing ledger) so they read as events happening, not the author ticking a list
+      - Use each character's "Voice"; characters never explain to each other what they both already know
+      - Concrete sensory detail and objects instead of adjectives; emotion through action, never "he felt…"
+      - Stop on the end hook from the outline: no summary, no preview, no uplift
+    acceptance: |
+      1. The first line is a "## Chapter 4: Title" heading and prose follows directly, with no notes, afterword or preamble
+      2. There is at least one exchange of dialogue, and the voices are distinguishable
+      3. The opening does not recap events the previous chapter already showed
+      4. The chapter stops on an unresolved image or action — no summary, no preview of the next chapter
+      5. The text never refers to "the previous chapter", "this chapter" or "the next chapter"
+    assert:
+      min_chars: "{{chapter_length}} * 3"
+      max_chars: "{{chapter_length}} * 8"
+    output: ch4
+    depends_on: [ledger3]
+
+  - id: ledger4
+    role: "academic/academic-narratologist"
+    name: "Ledger · after Ch. 4"
+    emoji: "📒"
+    task: |
+      You are the continuity editor. Starting from the previous ledger, read Chapter 4 and update the **fact ledger**. This is the last ledger before
+      the final chapter: list every setup that is still unpaid in its own section, **"Setups Chapter 5 must pay off"**.
+
+      ## Book outline
+      {{outline}}
+
+      ## Previous ledger
+      {{ledger3}}
+
+      ## Chapter 4
+      {{ch4}}
+
+      Update rules: keep entries that still hold; add facts Chapter 4 establishes; move every character to where they stand at the end of Chapter 4;
+      mark setups planted / paid off in this chapter; replace "Final frame" and "The next chapter must" with Chapter 4's. Same format, under 800 words.
+      Output only the full updated ledger. No comments on the prose, no revision advice, no follow-up offers.
+    output: ledger4
+    depends_on: [ch4]
+
+  - id: ch5
+    role: "marketing/marketing-content-creator"
+    name: "Chapter 5"
+    emoji: "🖋"
+    task: |
+      You are the author of this novella. Following the outline, write **Chapter 5** (the resolution of the whole book), about {{chapter_length}} words, {{style}}.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      ## Fact ledger (as of the previous chapter, including "Setups Chapter 5 must pay off") — the text must not contradict it
+      {{ledger4}}
+
+      ## Previous chapter in full (continue from its end state and tone)
+      {{ch4}}
+
+      Requirements:
+      - The first line is exactly `## Chapter 5: Title`. The prose follows directly — no notes, no afterword, no "Here is"
+      - Pick up from the ledger's "Final frame" and "The next chapter must"; do not recap the previous chapter
+      - Pay off every item in "Setups Chapter 5 must pay off", inside events — never by a character explaining it
+      - Use each character's "Voice"; characters never explain to each other what they both already know
+      - Concrete sensory detail and objects instead of adjectives; emotion through action, never "he felt…"
+      - End the book on its final image: the theme may only emerge, no character says it; no epilogue, no "years later" summary
+    acceptance: |
+      1. The first line is a "## Chapter 5: Title" heading and prose follows directly, with no notes, afterword or preamble
+      2. There is at least one exchange of dialogue, and the voices are distinguishable
+      3. The opening does not recap events the previous chapter already showed
+      4. It ends on an image, without explaining the mystery, stating the theme, or adding an epilogue-style summary
+      5. The text never refers to "the previous chapter", "this chapter" or "the next chapter"
+    assert:
+      min_chars: "{{chapter_length}} * 3"
+      max_chars: "{{chapter_length}} * 8"
+    output: ch5
+    depends_on: [ledger4]
+
+  # ── Continuity review of the whole book (notes only; rework a chapter with --from chN --feedback) ──
+  - id: review
+    role: "academic/academic-narratologist"
+    name: "Continuity Review"
+    emoji: "🧐"
+    task: |
+      You are the novella's editor. Read all five chapters against the outline, the character bible and the final ledger, and do a continuity review of the book.
+
+      ## Book outline
+      {{outline}}
+
+      ## Character bible
+      {{bible}}
+
+      ## Ledger (after Chapter 4)
+      {{ledger4}}
+
+      ## Chapter 1
+      {{ch1}}
+
+      ## Chapter 2
+      {{ch2}}
+
+      ## Chapter 3
+      {{ch3}}
+
+      ## Chapter 4
+      {{ch4}}
+
+      ## Chapter 5
+      {{ch5}}
+
+      Review, in priority order:
+      1. Factual contradictions: names / places / dates / objects / numbers that disagree across chapters
+      2. Foreshadowing: which setup from the outline was never planted, never paid off, or paid off only by a character explaining it
+      3. Characters off model: voice, signature detail or chapter-by-chapter state that doesn't match the bible; motives that change without an event behind them
+      4. Chapter joins: which opening recaps the previous chapter, which ending leaks the next
+      5. Language: similes and sentence shapes repeated across the book; passages that tell instead of show
+      6. Flaws in the outline itself: if the outline contradicts itself, say so and say how the text should resolve it (don't just follow the outline)
+
+      Output format:
+      - Grouped by chapter, at most 4 notes per chapter; one line each: **Where** (quote ≤ 15 words) → **Problem** → **Concrete fix**
+      - A final section, **"Rework"**: the chapters worth reworking, each with a one-line note, in the form `Chapter N: <note>`
+      - For a chapter with no issues, write "Chapter N: no rework needed"
+      - Do not rewrite the text, do not score it, no pleasantries, no follow-up offers
+    output: review_notes
+    depends_on: [ch5]
