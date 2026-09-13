@@ -52,6 +52,20 @@ const CLAUDE_CODE: ClaudeShapedCLIOptions = {
  * （user/assistant 消息 + 文件快照 + 最后一个 `type:"result"`，实测 2.103.3），
  * 直接当对象读会拿到 undefined → 误报"返回空内容"。
  */
+/**
+ * 剥掉答案首尾**独占一行**的控制标签（`</thinking_mode>` 这类 snake_case 标签，或 `<thinking>`）。
+ * 真机（2026-09-13，Studio 跑两步小工作流）：Claude Code 的 `result` 开头混进一行 `</thinking_mode>`，
+ * 原样进了交付物、导出的 Word 第一行就是它。AO 自己的提示词里没有这个标签，是模型侧偶发泄漏。
+ * 只动首尾、只认"整行就是一个无属性标签"——正文里讨论 XML、代码块里的标签一概不碰。
+ */
+export function stripStrayControlTags(text: string): string {
+  const TAG_LINE = /^[ \t]*<\/?(?:thinking|[a-z]+(?:_[a-z]+)+)>[ \t]*$/;
+  const lines = text.split('\n');
+  while (lines.length && (TAG_LINE.test(lines[0]) || !lines[0].trim())) lines.shift();
+  while (lines.length && (TAG_LINE.test(lines[lines.length - 1]) || !lines[lines.length - 1].trim())) lines.pop();
+  return lines.join('\n');
+}
+
 export function parseResultJson(stdout: string): any {
   const json = JSON.parse(stdout);
   if (Array.isArray(json)) {
@@ -186,7 +200,7 @@ export class ClaudeCodeConnector implements LLMConnector {
             return;
           }
 
-          const content = (json.result || '').trim();
+          const content = stripStrayControlTags((json.result || '').trim());
           if (!content) {
             reject(new Error(`${displayName} 返回空内容`));
             return;
@@ -203,7 +217,7 @@ export class ClaudeCodeConnector implements LLMConnector {
           });
         } catch {
           // JSON 解析失败，回退到原始文本
-          const content = stdout.trim();
+          const content = stripStrayControlTags(stdout.trim());
           if (!content) {
             reject(new Error(`${displayName} 返回空内容，stderr: ${stderr.slice(0, 500)}`));
             return;

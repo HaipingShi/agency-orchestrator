@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Copy, Download, FileDown, Loader2, MessageSquare, Minus, Scale, Square, Terminal, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tip } from "@/components/ui/tip";
 import { useCopy } from "@/components/ui/copy-button";
@@ -36,25 +36,25 @@ export function RunViewer({ onViewHistory, onGoProviders }: { onViewHistory?: ()
 
   // 模板声明了 deliverables（交付物步骤）时，复制/下载/导出默认只带成稿——
   // 小说的大纲、人设、审读意见是施工图，不该排在正文前面进 Word。菜单里可切回"含全部步骤"。
-  const deliverableSteps = useMemo(() => {
-    const declared = run?.source?.deliverables;
-    return run && declared?.length ? run.steps.filter((s) => declared.includes(s.id) && s.content.trim()) : [];
-  }, [run]);
+  // 不能 useMemo(…, [run])：RunManager 原地改同一个 inst（inst.steps = … / inst.state = "done"）再 force 重渲染，
+  // run 的引用从头到尾不变——memo 会永远停在"刚开跑、内容全空"那一刻，fullText 为空，
+  // 跑完后底栏的 复制 / 下载 .md / 导出 整组按钮都不出现（要关掉再打开才有）。无头浏览器真跑复现过。
+  // 这里只是拼几段文本，每次渲染直接算。
+  const declared = run?.source?.deliverables;
+  const deliverableSteps = run && declared?.length ? run.steps.filter((s) => declared.includes(s.id) && s.content.trim()) : [];
   const hasDeliverable = deliverableSteps.length > 0;
   const [exportAll, setExportAll] = useState(false);
-  const fullText = useMemo(() => {
-    if (!run) return "";
-    if (hasDeliverable && !exportAll) {
+  const fullText = !run
+    ? ""
+    : hasDeliverable && !exportAll
       // 产出自己以标题开头（分章小说每章第一行是 "## 第N章 …"）就不再套一层步骤名标题
-      return deliverableSteps.length === 1
+      ? deliverableSteps.length === 1
         ? deliverableSteps[0].content.trim()
-        : deliverableSteps.map((s) => (/^\s*#/.test(s.content) ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`)).join("\n\n---\n\n");
-    }
-    return run.steps
-      .filter((s) => s.content.trim())
-      .map((s) => (run.kind === "role" ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`))
-      .join("\n\n---\n\n");
-  }, [run, hasDeliverable, exportAll, deliverableSteps]);
+        : deliverableSteps.map((s) => (/^\s*#/.test(s.content) ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`)).join("\n\n---\n\n")
+      : run.steps
+          .filter((s) => s.content.trim())
+          .map((s) => (run.kind === "role" ? s.content.trim() : `## ${s.name ?? s.id}\n\n${s.content.trim()}`))
+          .join("\n\n---\n\n");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
