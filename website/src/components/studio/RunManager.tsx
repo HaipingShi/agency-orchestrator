@@ -9,7 +9,7 @@ export interface PendingInput {
   type: "human_input" | "approval";
 }
 
-export type StepStatus = "pending" | "running" | "done";
+export type StepStatus = "pending" | "running" | "done" | "failed" | "skipped";
 
 export interface LiveStep {
   id: string;
@@ -22,6 +22,8 @@ export interface LiveStep {
   meta?: string;
   /** 验收核验未满足的条目（来自 step-verify-item 事件），展示为核验详情而非正文 */
   verifyItems?: string[];
+  /** 步骤失败原因（step-failed 事件）。以前没有这个事件，报错被当成正文、步骤还打绿勾 */
+  error?: string;
   status: StepStatus;
 }
 
@@ -219,6 +221,18 @@ export function RunProvider({ children }: { children: ReactNode }) {
               upsert(data.id, { meta: data.meta, status: "done" });
             }
             break;
+          case "step-failed":
+            if (inst.kind === "role") {
+              const id0 = inst.steps[0]?.id ?? "single";
+              upsert(id0, { status: "failed", error: data.error });
+            } else if (data.id) {
+              upsert(data.id, { status: "failed", error: data.error });
+            }
+            break;
+          case "step-skipped":
+            // reason 为空 = 汇总尾部"⏭️ 跳过 N 步"那行来的，不覆盖先前"条件不满足"之类的原因
+            if (data.id) upsert(data.id, { status: "skipped", ...(data.reason ? { meta: data.reason } : {}) });
+            break;
           case "step-verify-item": {
             const i = inst.steps.findIndex((s) => s.id === data.id);
             const prev = i >= 0 ? inst.steps[i].verifyItems ?? [] : [];
@@ -248,9 +262,14 @@ export function RunProvider({ children }: { children: ReactNode }) {
             inst.pendingInput = null;
             inst.steps = inst.steps.map((s) => (s.status === "running" ? { ...s, status: "done" } : s));
             const hasContent = inst.steps.some((s) => s.content.trim());
-            if (data?.code && data.code !== 0 && !hasContent) {
+            const failedSteps = inst.steps.filter((s) => s.status === "failed");
+            // 有步骤失败 = 出错，哪怕别的步骤有产出——以前只看"有没有内容"，而失败报错本身被当成了内容，
+            // 于是撞额度、401 这类失败整次显示「已完成」，通知也报成功
+            if (data?.code && data.code !== 0 && (failedSteps.length > 0 || !hasContent)) {
               const msg = inst._stderr.trim();
-              inst.error = msg ? msg.split("\n").filter(Boolean).slice(-3).join("\n") : `${t.studio.run.runFailedExitCodePrefix}${data.code}${t.studio.run.runFailedExitCodeSuffix}`;
+              inst.error = failedSteps.length
+                ? `${t.studio.run.stepsFailedPrefix}${failedSteps.slice(0, 3).map((s) => `${s.name ?? s.id}：${s.error ?? ""}`).join("\n")}`
+                : msg ? msg.split("\n").filter(Boolean).slice(-3).join("\n") : `${t.studio.run.runFailedExitCodePrefix}${data.code}${t.studio.run.runFailedExitCodeSuffix}`;
               inst.state = "error";
             } else if (inst.state !== "error") {
               inst.state = "done";

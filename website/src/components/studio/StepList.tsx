@@ -1,4 +1,4 @@
-import { Check, Download, Loader2, MessageSquarePlus, RotateCw } from "lucide-react";
+import { Check, Download, Loader2, MessageSquarePlus, RotateCw, XCircle } from "lucide-react";
 import { useState } from "react";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tip } from "@/components/ui/tip";
@@ -27,6 +27,8 @@ export function StepList({
       {steps.map((s) => {
         const running = s.status === "running";
         const pending = s.status === "pending";
+        const failedStep = s.status === "failed";
+        const skipped = s.status === "skipped";
         // CLI 结果行形如 "33.1s | 345 tokens | 验收 ✓"——把验收段拆出来做成彩色徽章
         const verifMatch = s.meta?.match(/^(.*?)(?:\s*\|\s*)?(验收\s*[✓⚠️].*)$/);
         const baseMeta = verifMatch ? verifMatch[1] : s.meta;
@@ -38,7 +40,8 @@ export function StepList({
             className={cn(
               "rounded-2xl border transition-all",
               running ? "border-primary/50 bg-card/70 shadow-lg shadow-primary/10" : "border-border/70 bg-card/50",
-              pending && "opacity-55",
+              (pending || skipped) && "opacity-55",
+              failedStep && "border-red-500/40",
             )}
           >
             <div className="flex items-center justify-between gap-3 px-4 py-2.5">
@@ -57,6 +60,7 @@ export function StepList({
                   </span>
                 )}
                 {s.status === "done" && <Check className="size-3.5 shrink-0 text-emerald-500" />}
+                {failedStep && <XCircle className="size-3.5 shrink-0 text-red-500" />}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 {baseMeta && <span className="hidden text-xs text-muted-foreground sm:inline">{baseMeta}</span>}
@@ -114,11 +118,14 @@ export function StepList({
                   <>
                     <Markdown>{assetBase ? s.content.replace(/\]\((?:\.\.\/)?assets\//g, `](${assetBase}/`) : s.content}</Markdown>
                     {running && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-primary align-middle" />}
+                    {failedStep && s.error && <p className="mt-2 whitespace-pre-wrap text-sm text-red-500">{t.studio.shell.stepFailedPrefix}{s.error}</p>}
                   </>
+                ) : failedStep ? (
+                  <p className="whitespace-pre-wrap text-sm text-red-500">{t.studio.shell.stepFailedPrefix}{s.error || "—"}</p>
                 ) : (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground">
                     {running && <Loader2 className="size-3.5 animate-spin" />}
-                    {running ? t.studio.shell.thinking : "—"}
+                    {running ? t.studio.shell.thinking : skipped ? t.studio.shell.stepSkipped : "—"}
                   </p>
                 )}
               </div>

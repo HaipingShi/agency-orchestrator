@@ -128,6 +128,7 @@ export function WorkflowCanvas({ file, name, onClose, onSaved }: { file: string;
     const map: Record<string, ExecStatus> = {};
     for (const s of activeRun.steps) {
       map[s.id] = s.status === "done" ? "done"
+        : s.status === "failed" ? "error"
         : s.status === "running" ? (activeRun.state === "error" ? "error" : "running") // 失败时停在该步 → 红
         : "pending";
     }

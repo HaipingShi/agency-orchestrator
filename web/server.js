@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import { tmpdir, homedir } from 'node:os';
 import yaml from 'js-yaml';
 import { resolveDataDir, migrateLegacyData } from './data-dir.js';
+import { createRunOutputParser, matchStepFailed, matchRunSummary } from './run-output-parser.js';
 import { detectInstalledCliProviders, detectUsableCliProviders } from '../dist/providers/detect.js';
 import { API_PROVIDERS, API_PROVIDER_MAP, ANTHROPIC_PROVIDERS, ANTHROPIC_PROVIDER_MAP, VIDEO_PROVIDERS, VIDEO_PROVIDER_MAP } from '../dist/connectors/api-providers.js';
 import { localSdcppStatus } from '../dist/connectors/local-sdcpp.js';
@@ -905,94 +906,10 @@ app.post('/api/run', (req, res) => {
   const runId = String(++runSeq);
   send('start', { cmd: `ao run ${args.slice(2).join(' ')}`, resume: !!resume, fromStep, runId });
 
-  // Parse CLI output into structured events
+  // Parse CLI output into structured events——规则在 web/run-output-parser.js（纯函数；test/run-output-parser.ts
+  // 用真 reporter 的打印结果钉住。以前内联在这里，失败 / 跳过 / 部分失败三种行没有规则，全被当成步骤正文）
   let lineBuffer = '';
-  let currentStepId = null;
-  // 验收未过时，"完成 | … | 验收 ⚠️" 行之后紧跟若干 "⚠️ 未满足条目" 行——
-  // 它们是核验详情而非步骤产出，转成 step-verify-item 事件，别混进正文。
-  let inVerifyItems = false;
-
-  function parseLine(raw) {
-    const clean = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '').trim();
-    // ⚠️ 条目紧贴"完成 | … | 验收 ⚠️"行连续打印，首个空行即正文分界——
-    // 空行必须关闭 verify-item 窗口，否则正文里以 ⚠️ 开头的行会被误吞成核验条目
-    if (!clean) { inVerifyItems = false; return; }
-
-    // human_input / approval 节点暂停等待输入：引擎在 AO_WEB_INPUT 模式下发的机器标记。
-    // 转成 await-input 事件，前端弹框，用户输入经 POST /api/run-input 写回子进程 stdin。
-    const inputReq = clean.match(/^__AO_INPUT_REQUEST__(\{.*\})$/);
-    if (inputReq) {
-      try { send('await-input', { runId, ...JSON.parse(inputReq[1]) }); } catch { /* ignore malformed */ }
-      return;
-    }
-    // 开跑前的媒体花费预览（几条片 × 几秒 × 哪档）：引擎在 web 模式下发的机器标记，前端在步骤上方展示
-    const preflight = clean.match(/^__AO_PREFLIGHT__(\{.*\})$/);
-    if (preflight) {
-      try { send('preflight', JSON.parse(preflight[1])); } catch { /* ignore malformed */ }
-      return;
-    }
-
-    // Step start: "⏳ emoji name 执行中 ..."
-    const startMatch = clean.match(/^⏳\s+(\S+)\s+(.+?)\s+执行中/);
-    if (startMatch) {
-      const [, emoji, name] = startMatch;
-      send('step-start', { emoji, name });
-      return;
-    }
-
-    // Step header: "── [N/M] emoji name (id) ──"
-    const headerMatch = clean.match(/── \[(\d+)\/(\d+)\] (\S+)\s+(.+?)\s+\((\S+)\) ──/);
-    if (headerMatch) {
-      const [, cur, total, emoji, name, id] = headerMatch;
-      currentStepId = id;
-      send('step-header', { cur: +cur, total: +total, emoji, name, id });
-      return;
-    }
-
-    // Step done: "完成 | 22.5s | 695 tokens".
-    // NOTE: the step's CONTENT is printed AFTER this line, so we must keep
-    // currentStepId set here — clearing it would drop the whole step body.
-    const metaMatch = clean.match(/^完成\s*\|\s*(.+)/);
-    if (metaMatch && currentStepId) {
-      inVerifyItems = /验收\s*⚠️/.test(metaMatch[1]);
-      send('step-done', { id: currentStepId, meta: metaMatch[1] });
-      return;
-    }
-
-    // Verification detail lines right after a "完成 | … | 验收 ⚠️" line
-    if (inVerifyItems && currentStepId && /^⚠️\s*/.test(clean)) {
-      send('step-verify-item', { id: currentStepId, text: clean.replace(/^⚠️\s*/, '') });
-      return;
-    }
-    inVerifyItems = false;
-
-    // Workflow summary: "完成: 5/5 步 | ..." — end of all step output.
-    if (/完成:\s*\d+\/\d+\s*步/.test(clean)) {
-      send('workflow-summary', { text: clean });
-      currentStepId = null;
-      return;
-    }
-
-    // Trailing footer after the summary — never part of a step body.
-    if (/^详细输出[:：]/.test(clean) || /^💡/.test(clean) || /^可选步骤/.test(clean) || /^steps[:：]/i.test(clean)) {
-      // 把输出目录单独发给前端展示"保存位置"(用户反馈:不知道文件存在哪)
-      const m = clean.match(/(?:详细输出|Detailed output)[:：]?\s*(.+)$/i);
-      if (m) send('output-dir', { dir: resolve(DATA_DIR, m[1].trim()) });
-      currentStepId = null;
-      return;
-    }
-
-    // Pure separator lines (=====) — skip, but keep attributing to the step.
-    if (/^={3,}$/.test(clean)) return;
-
-    // Step content (printed after the "完成 | meta" line, until the next header)
-    if (currentStepId) {
-      const stripped = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/^\s{0,4}/, '');
-      if (!/^⏳.*\.\.\.\s*\d+s/.test(clean)) {
-        send('step-content', { id: currentStepId, text: stripped });
-      }
-    }
-  }
+  const { parseLine } = createRunOutputParser({ send, runId, resolveOutputDir: (p) => resolve(DATA_DIR, p) });
 
   console.log('[run]', NODE_BIN, args.join(' '));
   const child = spawn(NODE_BIN, args, {
@@ -1343,8 +1260,11 @@ app.post('/api/run-role', (req, res) => {
     if (/── \[\d+\/\d+\]/.test(clean)) { collecting = true; return; }
     // Step done
     if (/^完成\s*\|/.test(clean)) { send('step-done', { meta: clean.replace(/^完成\s*\|\s*/, '') }); return; }
-    // Workflow summary
-    if (/完成:\s*\d+\/\d+\s*步/.test(clean)) return;
+    // 步骤失败（"  失败: …"）：发给前端当错误显示，别当回答正文收进 content
+    const failed = matchStepFailed(raw);
+    if (failed !== null) { send('step-failed', { error: failed }); return; }
+    // Workflow summary（成功是"完成: n/m 步"，有步骤失败时是"部分失败: n/m 步"）
+    if (matchRunSummary(raw)) return;
     // 终端装饰噪音不能混进内容：====== 分隔线尾随文本行会被 Markdown 解析成 setext H1
     // (用户导出的 md 里"详细输出"上一行变超大标题的根因)；详细输出路径行单独发事件给 UI 展示
     if (/^=+$/.test(clean)) return;

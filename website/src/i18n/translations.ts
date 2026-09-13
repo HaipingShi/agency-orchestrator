@@ -347,6 +347,7 @@ const zh = {
       runFailedExitCodePrefix: "运行失败（退出码 ",
       runFailedExitCodeSuffix: "）",
       runError: "运行出错",
+      stepsFailedPrefix: "有步骤失败：\n",
       notifyDoneBody: "任务完成，点击查看成果",
       notifyFailBody: "任务失败，点击查看原因",
       goConfigureKey: "去配置密钥",
@@ -659,6 +660,8 @@ const zh = {
       feedbackSubmit: "交给 Ta 重做",
       verifyUnmet: "🔍 验收核验：以下条目未满足",
       verifyReworkBtn: "按未满足项重做这一步",
+      stepFailedPrefix: "这一步失败了：",
+      stepSkipped: "已跳过",
     },
     demo: {
       bannerTitle: "演示模式",
@@ -1140,6 +1143,7 @@ const en: typeof zh = {
       runFailedExitCodePrefix: "Run failed (exit code ",
       runFailedExitCodeSuffix: ")",
       runError: "Run error",
+      stepsFailedPrefix: "Some steps failed:\n",
       notifyDoneBody: "Run finished — click to view the results",
       notifyFailBody: "Run failed — click to see what went wrong",
       goConfigureKey: "Configure key",
@@ -1451,6 +1455,8 @@ const en: typeof zh = {
       feedbackSubmit: "Send back for revision",
       verifyUnmet: "🔍 Acceptance check: unmet items",
       verifyReworkBtn: "Redo this step against the unmet items",
+      stepFailedPrefix: "This step failed: ",
+      stepSkipped: "Skipped",
     },
     demo: {
       bannerTitle: "Demo mode",
