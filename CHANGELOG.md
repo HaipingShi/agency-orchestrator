@@ -36,7 +36,12 @@
   两个成稿步挂 `acceptance` + `assert.min_bytes`；`max_tokens` 2048 → 8192；输入加 `label` / `options`
   （Studio 里风格、字数变下拉）；每步明令不输出"需要的话我可以…"（旧版把 Claude Code 的后续提议当素材传给了下游）；
   声明 `deliverables: [final_story]`。真跑 5 分钟 / 15k token，责编 6 条意见定稿全部落实。
-
+- **短剧流水线：氛围锁定块 + 按类型的运镜节拍**（五段式方法论进短剧线）。新增 `atmosphere_lock` 步骤，
+  全片只写一次「机身+镜头 / 色彩与影调 / 光源 / 颗粒风格核心」，三镜提示词与定妆图提示词**逐字粘贴**它——
+  以前三镜并行各写各的氛围段，只能靠验收员事后挑"不一致"，一返工就是三条重来（上游
+  ai-shortfilm-prompts 的 project-planner 把这叫"剪辑型作品崩色调的头号原因"）。`shortfilm-prompt` 技能
+  新增「氛围锁定」规则与「按类型的默认运镜与节拍」表（剧情短剧 / 产品广告片 / 治愈日常 / 悬疑惊悚 /
+  搞笑段子 / 科幻 / 古风武侠 / 纪实 Vlog），来源是上游的 genre-camera-sop 与各题材范例。
 ### Fixed
 - **Studio 运行视图：看着运行跑完，底栏「复制 / 下载 .md / 导出」整组按钮不出现**（要关掉再打开才有）。
   `RunViewer` 用 `useMemo(…, [run])` 缓存导出文本，而 `RunManager` 原地改同一个运行对象再强制重渲染，
