@@ -25,6 +25,7 @@ import { verifyAcceptance, buildReworkBlock, formatFailedItems, verifyImageAccep
 import { extractFrames, jpegDataUri } from '../media/frames.js';
 import { FfmpegMissingError } from '../media/concat.js';
 import { checkAssert, resolveAssert, buildAssertReworkBlock } from './assert.js';
+import { startSleepWatch, type SleepWatch } from '../utils/sleep-watch.js';
 import { createInterface } from 'node:readline';
 
 export interface ExecutorOptions {
@@ -905,15 +906,33 @@ async function executeStep(
     let attemptTimeout = effectiveConfig.timeout !== undefined
       ? effectiveConfig.timeout
       : dynamicInitialTimeout(defaultTimeout, systemPrompt.length + message.length);
+    // 系统睡眠（合盖 / 自动睡眠）：本步期间一共睡了多久、因睡眠立即重试过几次。
+    // 睡眠打断的尝试不占 retry 名额、不放宽 timeout；封顶是防整夜"睡—暗唤醒—再睡"反复空转。
+    let sleptTotalMs = 0;
+    let sleepRetries = 0;
+    const MAX_SLEEP_RETRIES = 3;
+    const sleepRetryDelay = Number(process.env.AO_SLEEP_RETRY_DELAY_MS) || 2_000;
     for (let attempt = 0; attempt <= effectiveMaxRetry; attempt++) {
+      let sleepWatch: SleepWatch | null = null;
       try {
         // attemptTimeout 同时传给 connector（控制内层 fetch/CLI timeout）和 withTimeout（外层兜底），
         // 否则 connector 内部还按旧 timeout 硬断，递增就白加了
         const attemptConfig = { ...effectiveConfig, timeout: attemptTimeout };
-        const result = await withTimeout(
-          effectiveConnector.chat(systemPrompt, message, attemptConfig),
-          attemptTimeout
-        );
+        // 这次尝试期间一旦检测到系统睡过，立刻结束等待：连接大概率已被冻断，干等只会等满超时。
+        // 注意被放弃的那次 chat 不会被取消（connector 接口没有 signal），CLI 子进程由它自己的超时收尾。
+        let rejectOnSleep: (e: Error) => void = () => {};
+        const sleepAbort = new Promise<never>((_, reject) => { rejectOnSleep = reject; });
+        sleepAbort.catch(() => {});
+        sleepWatch = startSleepWatch((sleptMs) => {
+          sleptTotalMs += sleptMs;
+          const e = new Error(`系统睡眠打断了这次调用（睡了约 ${Math.round(sleptMs / 1000)}s），连接大概率已断`);
+          (e as { sleepInterrupted?: boolean }).sleepInterrupted = true;
+          rejectOnSleep(e);
+        });
+        const result = await Promise.race([
+          withTimeout(effectiveConnector.chat(systemPrompt, message, attemptConfig), attemptTimeout),
+          sleepAbort,
+        ]);
         addTokens({ input: result.usage.input_tokens, output: result.usage.output_tokens });
         if (!result.content.trim()) {
           // 空正文不是成功：下游拿空变量只会产出更离谱的东西（连接器层已拦 OpenAI 兼容，这里兜住 claude / CLI 等）
@@ -924,6 +943,17 @@ async function executeStep(
         return result.content;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        if ((lastError as { sleepInterrupted?: boolean }).sleepInterrupted) {
+          if (sleepRetries < MAX_SLEEP_RETRIES) {
+            sleepRetries++;
+            process.stderr.write(`\n  💤 ${node.step.id} ${lastError.message}，醒来立即重试（不占重试次数、不放宽超时）(${sleepRetries}/${MAX_SLEEP_RETRIES})...\n`);
+            attempt--;
+            await sleep(sleepRetryDelay);
+            continue;
+          }
+          // 反复睡醒（整夜合盖的形态）：别再按"超时"放宽重试白等几十分钟，直接失败，留给醒着时 --resume
+          break;
+        }
         if (attempt < effectiveMaxRetry && isRetryable(lastError) && !(lastError as { noRetry?: boolean }).noRetry) {
           const errorClass = classifyError(lastError);
           // connection 类错误（超时/ECONNRESET/aborted/socket hang up 等）→ 下一次 timeout x1.5
@@ -948,6 +978,8 @@ async function executeStep(
           continue;
         }
         break;  // 不可重试的错误，立即停止
+      } finally {
+        sleepWatch?.stop();
       }
     }
 
@@ -958,8 +990,11 @@ async function executeStep(
       return partial;
     }
 
-    // 超时/连接类失败：在错误信息后附上可操作指引（基于 effectiveConfig.provider）
-    if (lastError && classifyError(lastError) === 'connection') {
+    // 本步执行期间系统睡过：失败根因是睡眠冻住了连接，不是模型慢——此时"增大超时"是错误的建议，换成睡眠说明。
+    // 否则：超时/连接类失败，在错误信息后附上可操作指引（基于 effectiveConfig.provider）
+    if (lastError && sleptTotalMs > 0) {
+      lastError.message += sleepFailureHint(sleptTotalMs);
+    } else if (lastError && classifyError(lastError) === 'connection') {
       const noContent = !!(lastError as any).noContent || !!(lastError as any).stalled;
       lastError.message += timeoutFailureHint(effectiveConfig.provider, { noContent });
     }
@@ -1188,6 +1223,20 @@ function markDownstreamSkipped(dag: DAG, failedId: string): void {
     depNode.status = 'skipped';
     markDownstreamSkipped(dag, depId);
   }
+}
+
+/** 步骤因系统睡眠失败时的说明（替代"增大超时"那套——那对睡眠无效） */
+export function sleepFailureHint(sleptMs: number, platform: string = process.platform): string {
+  const minutes = Math.max(1, Math.round(sleptMs / 60_000));
+  const lines = [
+    '',
+    `  💤 这一步执行期间系统睡眠了约 ${minutes} 分钟：连接被冻住，不是模型慢，增大超时没有用。`,
+    '     醒着的时候用下面的 --resume 命令从这一步继续即可（上游产出直接复用）。',
+  ];
+  if (platform === 'darwin') {
+    lines.push('     长时间运行想合盖 / 离开：用 caffeinate -i 包住命令，例如 caffeinate -i ao run <workflow.yaml>');
+  }
+  return lines.join('\n');
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
