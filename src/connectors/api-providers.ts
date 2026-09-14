@@ -90,6 +90,16 @@ export const API_PROVIDERS: ApiProviderSpec[] = [
   // 模型编码一个都没核实过，猜一个写进去就是多元探索踩过的坑（默认模型平台没上架 → 一跑就报错）。
   // 留空 = 强制用户自选；配了 key 点「获取模型列表」即拉真实全量（同 LanoX 的处理）。
   { id: 'apimart', envKey: 'APIMART_API_KEY', envBase: 'APIMART_BASE_URL', defaultBaseUrl: 'https://api.apimart.ai/v1' },
+  // PackyCode（赞助商，2026-09-14 上架）—— API 中转：统一域名 www.packyapi.ai，一把 key 通
+  // Claude / GPT / Gemini / DeepSeek / Qwen 等。
+  // 端点已探测核实（2026-09-14，用无效 key）：/v1/models、/v1/chat/completions、/v1/responses、
+  // /v1/messages、/v1/images/generations、/v1/videos、/v1beta/models 均回 401「无效的令牌」；
+  // 同级乱写路径（/v1/zzz、/v1beta/zzz）回 404 Invalid URL —— 401 确实代表路径存在，不是网关假壳。
+  // 模型清单公开：GET https://www.packyapi.ai/api/pricing 无需 key，每个模型带 enable_groups
+  // 与 supported_endpoint_types（Studio 的 modelSuggestions 取自那里）。
+  // **不设 defaultModel**：模型按"分组"开放（如 claude-sonnet-5 只在 claude-officially / cc 等组），
+  // 用户令牌属于哪个分组我们无从得知，猜一个默认值就可能一跑报"该分组无此模型"。
+  { id: 'packycode', envKey: 'PACKYCODE_API_KEY', envBase: 'PACKYCODE_BASE_URL', defaultBaseUrl: 'https://www.packyapi.ai/v1' },
 
   // ── 第一方厂商官方 API（非赞助商，2026-08 补齐）────────────────────────────
   // **范围是有意收住的：只收这五家主流**（2026-08-14 决定）。cc-switch 还带着

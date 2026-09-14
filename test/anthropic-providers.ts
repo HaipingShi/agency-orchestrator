@@ -157,27 +157,27 @@ test('官网赞助商页：旗舰打头，AICodeMirror 紧随其后；已下架�
 });
 
 // 「最后一位」这个位置是给最新上架的那家的：LanoX 于 2026-08 上架时占着，同月胜算云上架后
-// 顺位后移，2026-08-23 APIMart 接入后再后移一位。改这条断言时记得两处一起改
-// （Studio 列表 + 官网卡片），它防的是"顺序被无意打乱"，不是阻止正常上架。
-test('Studio 供应商列表：秘塔排赞助商组最后一位（最新接入者）', () => {
+// 顺位后移，2026-08-23 APIMart、秘塔依次接入，2026-09-14 PackyCode 上架后再后移一位。
+// 改这条断言时记得两处一起改（Studio 列表 + 官网卡片），它防的是"顺序被无意打乱"，不是阻止正常上架。
+test('Studio 供应商列表：PackyCode 排赞助商组最后一位（最新接入者）', () => {
   const order = providerOrder();
-  const i = order.indexOf('metaso');
-  assert(i >= 0, `metaso 不在 Studio 供应商列表里：${order.join(' → ')}`);
-  assert(order.indexOf('apimart') === i - 1, `APIMart 应紧邻末位（接入顺序仅早于秘塔）：${order.join(' → ')}`);
+  const i = order.indexOf('packycode');
+  assert(i >= 0, `packycode 不在 Studio 供应商列表里：${order.join(' → ')}`);
+  assert(order.indexOf('metaso') === i - 1, `秘塔应紧邻末位（接入顺序仅早于 PackyCode）：${order.join(' → ')}`);
   // 后面只允许跟「非赞助商」（自家 API / 已下架的），不能再冒出别的赞助商把它顶到中间
   const block = studioSrc.slice(studioSrc.indexOf('export const API_PROVIDERS: ApiProviderMeta[]'));
   const lines = block.slice(0, block.indexOf('\n];')).split('\n').filter((l) => /\{ id: "/.test(l));
   const after = lines.slice(i + 1).filter((l) => /sponsor: true|flagship: true|advanced: true/.test(l));
-  assert(after.length === 0, `秘塔之后还排着别的赞助商：\n    ${after.join('\n    ')}`);
+  assert(after.length === 0, `PackyCode 之后还排着别的赞助商：\n    ${after.join('\n    ')}`);
 });
 
-test('官网赞助商页：最新上架的赞助商排最后一张卡（当前=秘塔科技）', () => {
-  // 惯例：新赞助商上架时排末位（LanoX→胜算云→APIMart→秘塔 均如此）。
+test('官网赞助商页：最新上架的赞助商排最后一张卡（当前=PackyCode）', () => {
+  // 惯例：新赞助商上架时排末位（LanoX→胜算云→APIMart→秘塔→PackyCode 均如此）。
   // 每次上架新赞助商后同步更新这里的末位 id——这条测试的职责是防"顺序被无意打乱"，
   // 不是阻止正常上架。
   const ids = [...sponsorsSrc.matchAll(/^    id: "([\w-]+)"/gm)].map((m) => m[1]);
-  assert(ids[ids.length - 1] === 'metaso', `末位应为 metaso（最新上架），实际顺序：${ids.join(' → ')}`);
-  assert(ids.indexOf('apimart') === ids.length - 2, 'APIMart 应紧邻末位（上架顺序仅早于秘塔）');
+  assert(ids[ids.length - 1] === 'packycode', `末位应为 packycode（最新上架），实际顺序：${ids.join(' → ')}`);
+  assert(ids.indexOf('metaso') === ids.length - 2, '秘塔应紧邻末位（上架顺序仅早于 PackyCode）');
 });
 
 test('CLI 中转商卡片按实际端点写"支持哪几个 CLI"，不写死三个', () => {

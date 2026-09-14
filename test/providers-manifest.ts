@@ -147,6 +147,16 @@ test('胜算云的中转预设已上架，且端点与内置预设一致（2026-
   assert(ssy!.baseUrls['codex-cli'] === 'https://router.shengsuanyun.com/api/v1', `codex-cli 端点不对: ${ssy!.baseUrls['codex-cli']}`);
 });
 
+test('PackyCode 的中转预设已上架，且端点与内置预设一致（2026-09-14 新增）', () => {
+  const pc = (m.relayPresets ?? []).find((r) => /packycode/i.test(r.name));
+  assert(!!pc, '清单里应有 PackyCode 预设（这样还停在旧版的用户不等发版也能用）');
+  // 官网域名是 packyapi.ai 的 **www** 子域；api.packyapi.ai 解析不到（2026-09-14 实测），照惯例猜 api. 必错
+  assert(pc!.baseUrls['claude-code'] === 'https://www.packyapi.ai', `claude-code 端点不对（Anthropic 协议，base 不带 /v1）: ${pc!.baseUrls['claude-code']}`);
+  assert(pc!.baseUrls['gemini-cli'] === 'https://www.packyapi.ai', `gemini-cli 端点不对: ${pc!.baseUrls['gemini-cli']}`);
+  assert(pc!.baseUrls['codex-cli'] === 'https://www.packyapi.ai/v1', `codex-cli 端点不对: ${pc!.baseUrls['codex-cli']}`);
+  assert(pc!.signupUrl === 'https://www.packyapi.ai/register?aff=js5W', `返利链接不对: ${pc!.signupUrl}`);
+});
+
 test('轮换池与代码里的那份逐条一致（清单配了就整池替换，漏一家=那家线上零曝光）', () => {
   const pool = m.sponsorRotation ?? [];
   assert(pool.length === SPONSOR_ROTATION.length,

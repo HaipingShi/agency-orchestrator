@@ -3,7 +3,7 @@ import type { Language } from "@/i18n/translations";
 /**
  * 赞助商数据。
  *
- * 当前赞助商：APINEBULA（旗舰，银河录像局旗下 AI 聚合平台）、优云智算（UCloud 旗下 AI 云平台）、Cubence（API 中转服务商）、火山引擎（字节跳动云服务，中英文分别对应 volcengine.com / byteplus.com 两个不同站点）、AICodeMirror（Claude / Codex / Gemini 官方高稳定中转）、LanoX AI（全球模型聚合，500+ 模型）、胜算云（面向 AI 原生团队的模型 API 聚合 + 企业级网关）、APIMart（AI 图片/视频生成低价 API）、秘塔科技（MiniMax H3 视频生成 API）。
+ * 当前赞助商：APINEBULA（旗舰，银河录像局旗下 AI 聚合平台）、优云智算（UCloud 旗下 AI 云平台）、Cubence（API 中转服务商）、火山引擎（字节跳动云服务，中英文分别对应 volcengine.com / byteplus.com 两个不同站点）、AICodeMirror（Claude / Codex / Gemini 官方高稳定中转）、LanoX AI（全球模型聚合，500+ 模型）、胜算云（面向 AI 原生团队的模型 API 聚合 + 企业级网关）、APIMart（AI 图片/视频生成低价 API）、秘塔科技（MiniMax H3 视频生成 API）、PackyCode（API 中转，统一域名统一密钥）。
  * 均为真实付费赞助，非占位样例。新增赞助商时按 Sponsor 结构追加即可。
  * 已下架：RootFlowAI、CCSub（2026-08）、多元探索（2026-08-17，赞助到期）——赞助身份与
  * 曝光位一并摘除，但它们在 Studio 里仍是可用供应商（已配过 key 的用户不该被搞坏）。
@@ -160,8 +160,8 @@ export const sponsors: Sponsor[] = [
       en: "AI cloud platform by UCloud · cost-effective Agent Plans",
     },
     description: {
-      zh: "感谢优云智算赞助了本项目！优云智算是 UCloud 旗下 AI 云平台，主打包月、按次的高性价比国产模型 Agent Plan 套餐，低至 49 元/月起。同时提供官转稳定海外模型，支持接入 Claude Code、Codex 及 API 调用。企业级高并发、7×24 技术支持、自助开票。",
-      en: "Thanks to CompShare (优云智算) for sponsoring this project! CompShare is UCloud's AI cloud platform, offering cost-effective monthly / pay-per-call Agent Plans for Chinese models from ¥49/mo, plus stable official relays for overseas models. Works with Claude Code, Codex and direct API calls — with enterprise-grade concurrency, 24/7 support and self-service invoicing.",
+      zh: "感谢优云智算赞助本项目！优云智算是 UCloud 旗下 AI 云平台，主打包月、按次的高性价比国模 Agent Plan 套餐，支持 GLM-5.2，低至 49 元/月起。最新上线 H3 视频生成套餐包，768P 低至 8 分/秒，支持 2K 画质，最长 30s 视频生成。支持企业高并发、7×24 技术支持、自助开票。🎁 通过此链接注册的用户，可得免费 5 元平台体验金！",
+      en: "Thanks to CompShare (优云智算) for sponsoring this project! CompShare is UCloud's AI cloud platform, offering cost-effective monthly / pay-per-call Agent Plans for Chinese models — now with GLM-5.2 — from ¥49/mo. New: an H3 video generation bundle from ¥0.08/s at 768P, with 2K quality and videos up to 30s. Enterprise-grade concurrency, 24/7 support and self-service invoicing. 🎁 Sign up through this link to get ¥5 in free platform credit!",
     },
     perk: {
       zh: "新用户注册立得 5 元平台体验金",
@@ -258,6 +258,29 @@ export const sponsors: Sponsor[] = [
     perk: {
       zh: "通过专属链接注册，即可享受赠送额度及专属优惠",
       en: "Sign up via our link to get bonus credit and an exclusive discount",
+    },
+  },
+  {
+    id: "packycode",
+    name: "PackyCode",
+    badge: "P",
+    accent: "from-emerald-500 to-green-400",
+    logo: "/sponsors/logo-packycode-icon.png",
+    url: "https://www.packyapi.ai/register?aff=js5W",
+    tier: "standard",
+    since: "2026-09",
+    featured: false,
+    tagline: {
+      zh: "稳定高效的 API 中转 · 一句话接入主流大模型，多分组低至 2 折",
+      en: "Stable, fast API relay · one endpoint for leading models, routes from 20% of list price",
+    },
+    description: {
+      zh: "感谢 PackyCode 赞助了本项目！PackyCode 是一家稳定、高效的 API 中转服务商，一句话接入主流大模型：统一域名、统一密钥、智能容灾切换，97% 可用性。人民币 1:1 充值，无汇率无手续费坑；多分组折扣低至 2 折起，并提供专属 Codex / Claude Code 高速通道。支持 Stripe、支付宝、微信、银行卡与对公付款，对公可开票，支持退款。",
+      en: "Thanks to PackyCode for sponsoring this project! PackyCode is a stable, efficient API relay: access leading AI models with one API endpoint and one API key, with automatic failover, 97% availability and dedicated high-speed routes for Codex and Claude Code. Pay in RMB with no currency conversion markups or extra top-up fees, and save up to 80% on eligible routes. Pay via Stripe, Alipay, WeChat Pay, bank card or corporate transfer — invoices for corporate payments, refunds supported.",
+    },
+    perk: {
+      zh: "新用户首充立享折扣 + $1 免费体验额度",
+      en: "$1 in free credits plus a discount on your first top-up",
     },
   },
 ];

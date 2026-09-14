@@ -214,6 +214,7 @@ export function ProvidersPanel({ active, onSetActive, offline = false }: { activ
     : id === "shengsuanyun" ? t.studio.providers.shengsuanyunName
     : id === "apimart" ? t.studio.providers.apimartName
     : id === "metaso" ? t.studio.providers.metasoName
+    : id === "packycode" ? t.studio.providers.packycodeName
     : fallback;
   const displayHint = (id: string, fallback: string) =>
     id === "compshare" ? t.studio.providers.compshareHint
@@ -227,6 +228,7 @@ export function ProvidersPanel({ active, onSetActive, offline = false }: { activ
     : id === "shengsuanyun" ? t.studio.providers.shengsuanyunHint
     : id === "apimart" ? t.studio.providers.apimartHint
     : id === "metaso" ? t.studio.providers.metasoHint
+    : id === "packycode" ? t.studio.providers.packycodeHint
     : fallback.replace("{etc}", t.studio.providers.etc);
 
   const keyStatus = (id: string): { line: string; tone: "muted" | "ok" } => {

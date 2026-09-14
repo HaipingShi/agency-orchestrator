@@ -668,7 +668,7 @@ export function groupModelsByVendor(models: string[], vendors?: Record<string, s
 
 // 有正方形图标素材的赞助商/供应商 → website/public/sponsors/logo-<id>-icon.png（served at /sponsors/…）。
 // 只对确有文件的 id 返回路径，避免其它供应商拿到 404 的 <img>。
-const PROVIDER_LOGO_IDS = new Set(["compshare", "cubence", "apinebula", "rootflowai", "ccsub", "volcengine", "duoyuanx", "aicodemirror", "lanox", "shengsuanyun", "apimart", "metaso"]);
+const PROVIDER_LOGO_IDS = new Set(["compshare", "cubence", "apinebula", "rootflowai", "ccsub", "volcengine", "duoyuanx", "aicodemirror", "lanox", "shengsuanyun", "apimart", "metaso", "packycode"]);
 /** 少数供应商的 logo 是 svg（AICodeMirror），其余是 png —— 硬编码扩展名会 404 */
 const PROVIDER_LOGO_SVG_IDS = new Set(["aicodemirror"]);
 export function providerLogo(id: string): string | undefined {
@@ -965,6 +965,12 @@ export const API_PROVIDERS: ApiProviderMeta[] = [
   // 建任务/查状态两条路径已用真 key 实探核实（见引擎 VIDEO_PROVIDERS 的说明）。
   // videoOnly：它没有 chat/images 端点，进了模型下拉就是给用户挖坑。
   { id: "metaso", name: "秘塔科技", shortName: "秘塔", hint: "metaso.cn · MiniMax-H3 文生视频 · 768P 0.09 元/秒", defaultBaseUrl: "https://metaso.cn/api/minimax", signupUrl: "https://metaso.cn/minimax-h3/?s=gt533367", sponsor: true, videoOnly: true, modelSuggestions: ["MiniMax-H3"] },
+  // 赞助商 PackyCode（2026-09-14 上架，按约定排赞助商组最后一位）—— API 中转，统一域名 www.packyapi.ai。
+  // 直连走 OpenAI 兼容 /v1（端点探测见引擎 API_PROVIDERS 的说明）；编码 CLI 中转见 CLI_RELAY_PRESETS。
+  // modelSuggestions / imageModels 取自它公开的 GET /api/pricing（无需 key，2026-09-14 实拉），
+  // 五个文本模型的 supported_endpoint_types 都含 openai；gpt-image-2 在 image 分组、端点类型 image-generation。
+  // 模型按分组开放，用户令牌不在对应分组就用不了——所以只做下拉建议，不设默认模型。
+  { id: "packycode", name: "PackyCode", hint: "www.packyapi.ai · 人民币 1:1 充值 · 新用户送 $1 体验额度", defaultBaseUrl: "https://www.packyapi.ai/v1", signupUrl: "https://www.packyapi.ai/register?aff=js5W", sponsor: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-5", "gpt-5.5", "gemini-3.5-flash", "deepseek-v4-pro"], imageModels: ["gpt-image-2"] },
   { id: "deepseek", name: "DeepSeek", hint: "platform.deepseek.com", defaultBaseUrl: "https://api.deepseek.com/v1", vendor: true, modelSuggestions: ["deepseek-chat", "deepseek-reasoner"] },
   // 默认端点**不带 /v1**：Anthropic 客户端（SDK / claude CLI）自己会接 /v1/messages，
   // base 里再写一遍就成了 /v1/v1/messages。这里是用户配中转时照抄的形状样板，写错等于
@@ -1156,6 +1162,25 @@ export const CLI_RELAY_PRESETS: CliRelayPreset[] = [
       "claude-code": "https://router.shengsuanyun.com/api",
       "gemini-cli": "https://router.shengsuanyun.com/api",
       "codex-cli": "https://router.shengsuanyun.com/api/v1",
+    },
+  },
+  // PackyCode（赞助商，2026-09-14）—— 官方文档的 Claude Code 最小配置就是 ANTHROPIC_BASE_URL +
+  // ANTHROPIC_AUTH_TOKEN，Codex / Gemini 各有专页，宣传里也有专属 Codex / Claude Code 高速通道。
+  // 端点探测（无效 key）：/v1/messages、/v1/responses、/v1beta/models 均 401=存在，而乱写的
+  // /v1/zzz、/v1beta/zzz 回 404 Invalid URL —— 状态码可信，不是 LanoX 那种"哪儿都 200"。
+  //   Claude Code → https://www.packyapi.ai（不带 /v1，CLI 自己接 /v1/messages）
+  //   Gemini CLI  → https://www.packyapi.ai（CLI 自己接 /v1beta/models/{model}:generateContent）
+  //   Codex       → https://www.packyapi.ai/v1（wire_api=responses 落到 /v1/responses）
+  // 注意是 **www** 子域：api.packyapi.ai 解析不到。
+  {
+    name: "PackyCode",
+    sponsor: true,
+    signupUrl: "https://www.packyapi.ai/register?aff=js5W",
+    anthropicApiBaseUrl: "https://www.packyapi.ai",
+    baseUrls: {
+      "claude-code": "https://www.packyapi.ai",
+      "gemini-cli": "https://www.packyapi.ai",
+      "codex-cli": "https://www.packyapi.ai/v1",
     },
   },
 ];
