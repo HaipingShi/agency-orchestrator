@@ -17,12 +17,10 @@ export function SponsorTierSection({ tier }: { tier: SponsorTier }) {
   const title = tier === "flagship" ? s.flagshipLabel : s.standardLabel;
   const desc = tier === "flagship" ? s.flagshipDesc : s.standardDesc;
 
-  // 用「虚位以待」补齐空位：旗舰至少 1 格；更多档至少 3 格，且把最后一行补满（一行 4 张），
-  // 免得最新上架的那家孤零零占一行。
+  // 「虚位以待」只在该档一家都没有时占位（旗舰 1 格 / 更多档 3 格）；有赞助商就不展示空位
+  // （2026-09-14 用户要求：更多赞助商不补空卡）。
   const isFlagship = tier === "flagship";
-  const reservedCount = isFlagship
-    ? Math.max(0, RESERVED_BY_TIER[tier] - list.length)
-    : Math.max(RESERVED_BY_TIER[tier] - list.length, (4 - (list.length % 4)) % 4, 0);
+  const reservedCount = list.length > 0 ? 0 : RESERVED_BY_TIER[tier];
 
   return (
     <section className="container-page py-10">
