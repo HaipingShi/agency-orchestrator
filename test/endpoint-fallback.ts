@@ -14,6 +14,7 @@ import {
   sameCredentialScope,
   isGatewayRouteMissShell,
   envProxyHint,
+  endpointHint,
 } from '../src/connectors/openai-compatible.js';
 import { OllamaConnector } from '../src/connectors/ollama.js';
 
@@ -336,6 +337,16 @@ assert(new OllamaConnector('localhost:11434') instanceof OllamaConnector, 'Ollam
   assert(/proxy\.internal:8080/.test(withCreds), '去掉凭证后仍要能看出打的是哪个代理');
   // 大小写两种写法都要认（很多人只 export 小写的）
   assert(envProxyHint({ https_proxy: 'http://127.0.0.1:1080' } as NodeJS.ProcessEnv) !== '', '小写 https_proxy 也要认');
+}
+
+// ── 503 + model_not_found：伪装成上游故障的账号配置问题（PackyCode 真实报文，2026-09-14）──
+{
+  const body = '{"error":{"code":"model_not_found","message":"分组 default 下模型 claude-sonnet-5 无可用渠道（distributor），请尝试切换其他分组","type":"packy_api_error"}}';
+  const hint = endpointHint(503, 'https://www.packyapi.ai/v1/chat/completions', 'https://www.packyapi.ai/v1', undefined, body);
+  assert(/分组/.test(hint) && /重试无用/.test(hint), '分组无渠道时要说清是账号配置问题、重试无用');
+  assert(!/稍后重试/.test(hint), '别再叫人"稍后重试或换一家"');
+  assert(/5xx = 上游服务异常/.test(endpointHint(503, 'https://x/v1/chat/completions', 'https://x/v1')), '没有正文（或普通 5xx）时仍给原来的上游故障提示');
+  assert(/5xx = 上游服务异常/.test(endpointHint(502, 'https://x/v1/chat/completions', 'https://x/v1', undefined, '<html>Bad Gateway</html>')), '普通 502 正文不被误认成模型不可用');
 }
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed\n`);

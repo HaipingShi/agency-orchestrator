@@ -267,11 +267,26 @@ export function envProxyHint(env: NodeJS.ProcessEnv = process.env): string {
   ].join('\n  ');
 }
 
-/** 把 HTTP 错误码翻成用户能照做的排查话术（连接器与「测试连接」共用） */
-export function endpointHint(status: number, url: string, baseUrl: string, drift?: string): string {
+/**
+ * 中转网关明说「这个 key 所在分组下没有该模型的可用渠道」。new-api 系网关（PackyCode 等）回的是
+ * 503 + `model_not_found`「分组 default 下模型 X 无可用渠道」——状态码像临时故障，其实是账号配置问题，
+ * 重试多少次都一样（2026-09-14 真 key 实测：按 5xx 重试 5 次白等 43 秒，提示还叫人"稍后重试"）。
+ * executor 的重试分级用同一口径判定不重试。
+ */
+export function isModelUnavailable(text: string): boolean {
+  return /model_not_found|无可用渠道|no available channel/i.test(text);
+}
+
+/** 把 HTTP 错误码翻成用户能照做的排查话术（连接器与「测试连接」共用）。body 可选：有正文时能认出"模型不可用"这类伪装成 5xx 的账号问题 */
+export function endpointHint(status: number, url: string, baseUrl: string, drift?: string, body?: string): string {
   const lines = [`请求地址: POST ${url}`];
   if (drift) lines.push(`发生了跳转/换路径: ${drift} —— 建议把 base_url 直接改成最终地址`);
-  if (status === 404 || status === 405) {
+  if (body && isModelUnavailable(body)) {
+    lines.push(
+      '模型不可用：该 key 所在的分组里没有这个模型的可用渠道 —— 这是账号配置问题，不是临时故障，重试无用',
+      '去中转商控制台给这个令牌换一个包含该模型的分组，或换成该分组下能用的模型（配好 key 点「获取模型列表」看实际可用的）',
+    );
+  } else if (status === 404 || status === 405) {
     lines.push(
       status === 405
         ? '405 = 地址存在但不接受 POST：多为 base_url 被 301/302 跳转（http→https、带不带 www）后请求被降级成 GET，或填成了网页/控制台地址'

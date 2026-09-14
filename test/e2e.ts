@@ -382,6 +382,32 @@ await test('非重试错误直接失败不重试', async () => {
   assert(callCount === 1, `不可重试错误应只调用 1 次，实际: ${callCount}`);
 });
 
+await test('中转网关 503 + model_not_found（分组下无可用渠道）不重试', async () => {
+  // 真实报文（PackyCode，2026-09-14）：状态码像临时故障，其实是令牌分组没开这个模型，重试 5 次白等 43 秒
+  const wf = parseWorkflow(resolve(import.meta.dirname!, '../workflows/product-review.yaml'));
+  wf.steps = [wf.steps[0]];
+  const dag = buildDAG(wf);
+
+  let callCount = 0;
+  const groupMock: LLMConnector = {
+    async chat(_sys, _msg, _cfg) {
+      callCount++;
+      throw new Error('API error 503: {"error":{"code":"model_not_found","message":"分组 default 下模型 claude-sonnet-5 无可用渠道（distributor），请尝试切换其他分组","type":"packy_api_error"}}');
+    }
+  };
+
+  const result = await executeDAG(dag, {
+    connector: groupMock,
+    agentsDir,
+    llmConfig: { ...wf.llm, retry: 3 },
+    concurrency: 1,
+    inputs: new Map([['prd_content', 'Test']]),
+  });
+
+  assert(result.success === false, '模型不可用应直接失败');
+  assert(callCount === 1, `分组无渠道不该重试，应只调用 1 次，实际: ${callCount}`);
+});
+
 await test('失败摘要包含失败步骤和跳过步骤', async () => {
   const wf = parseWorkflow(resolve(import.meta.dirname!, '../workflows/product-review.yaml'));
   const dag = buildDAG(wf);

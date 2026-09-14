@@ -250,7 +250,7 @@ export class OpenAICompatibleConnector implements LLMConnector {
         // 光一句「API error 405」用户无从查起——把实际请求地址、跳转情况和该状态码的
         // 常见成因一并带上（405 几乎必然是 base_url 配错/被跳转，见 endpointHint）
         throw new Error(
-          `API error ${response.status}: ${text.slice(0, 500)}${endpointHint(response.status, requestUrl, this.baseUrl, drift)}`,
+          `API error ${response.status}: ${text.slice(0, 500)}${endpointHint(response.status, requestUrl, this.baseUrl, drift, text)}`,
         );
       }
 

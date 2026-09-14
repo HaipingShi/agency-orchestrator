@@ -1255,6 +1255,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 /** 错误分级：不同错误类型使用不同退避策略（借鉴 Claude Code 架构） */
 function classifyError(error: Error): 'rate_limit' | 'server_error' | 'connection' | 'non_retryable' {
   const msg = error.message.toLowerCase();
+  // 中转网关明说「该分组下没有这个模型的可用渠道」：状态码是 503，但属于账号配置问题，重试无用。
+  // 必须排在 5xx 判定之前（与 connectors/endpoint.ts 的 isModelUnavailable 同一口径）
+  if (/model_not_found|无可用渠道|no available channel/.test(msg))
+    return 'non_retryable';
   // 限速：需要更长退避。用 \b 边界匹配，避免 "1429ms" / "429 ids" 等子串误判
   if (/\b429\b/.test(msg) || msg.includes('rate'))
     return 'rate_limit';
