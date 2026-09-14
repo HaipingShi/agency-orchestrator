@@ -99,6 +99,9 @@ export const API_PROVIDERS: ApiProviderSpec[] = [
   // 与 supported_endpoint_types（Studio 的 modelSuggestions 取自那里）。
   // **不设 defaultModel**：模型按"分组"开放（如 claude-sonnet-5 只在 claude-officially / cc 等组），
   // 用户令牌属于哪个分组我们无从得知，猜一个默认值就可能一跑报"该分组无此模型"。
+  // 备用主机（取自 cc-switch 的 endpointCandidates，2026-09-14 逐条无效 key 实探为同一网关）：
+  // https://cf.api.fan/v1、https://slb-v1.api.fan/v1、https://www.packyapi.com/v1 —— 主域连不上时
+  // 用 PACKYCODE_BASE_URL（或 Studio 里改 base）切过去即可，默认值仍以官方主域为准。
   { id: 'packycode', envKey: 'PACKYCODE_API_KEY', envBase: 'PACKYCODE_BASE_URL', defaultBaseUrl: 'https://www.packyapi.ai/v1' },
 
   // ── 第一方厂商官方 API（非赞助商，2026-08 补齐）────────────────────────────
