@@ -10,7 +10,7 @@
  * 这里测的是「文件本身是否符合那份约束」，以及下架/上架的意图有没有真的写进去。
  */
 import { readFileSync } from 'node:fs';
-import { API_PROVIDERS } from '../src/connectors/api-providers.js';
+import { API_PROVIDERS, ANTHROPIC_PROVIDERS } from '../src/connectors/api-providers.js';
 import { SPONSOR_ROTATION } from '../src/utils/sponsor-guide.js';
 
 let passed = 0;
@@ -75,7 +75,8 @@ test('增量上架的 id 不能覆盖内置 provider（服务端会拒，这里�
 });
 
 test('要下架的 id 必须真的是内置 provider（写错等于什么都没下架）', () => {
-  const builtin = new Set(API_PROVIDERS.map((p) => p.id));
+  // Anthropic 协议的内置 provider（如 aicodemirror）同样出现在 Studio 列表里，也能被下架
+  const builtin = new Set([...API_PROVIDERS, ...ANTHROPIC_PROVIDERS].map((p) => p.id));
   for (const id of m.removedProviders ?? []) {
     assert(builtin.has(id), `removedProviders 里的 "${id}" 不是内置 provider id，下架不会生效`);
   }
@@ -114,19 +115,17 @@ test('RootFlowAI / CCSub 已下架（2026-08）', () => {
   }
 });
 
-test('下架只隐藏列表，不动引擎——两家仍是可用 provider', () => {
-  const builtin = new Set(API_PROVIDERS.map((p) => p.id));
-  for (const id of ['rootflowai', 'ccsub']) {
+test('下架只隐藏列表，不动引擎——已下架的仍是可用 provider', () => {
+  const builtin = new Set([...API_PROVIDERS, ...ANTHROPIC_PROVIDERS].map((p) => p.id));
+  for (const id of ['rootflowai', 'ccsub', 'aicodemirror']) {
     assert(builtin.has(id), `${id} 不该从引擎里删掉：已配好 key 的用户还要能跑`);
   }
 });
 
-test('AICodeMirror 的中转预设已上架，且端点与内置预设一致', () => {
-  const acm = (m.relayPresets ?? []).find((r) => /aicodemirror/i.test(r.name));
-  assert(!!acm, '清单里应有 AICodeMirror 预设（这样老版本不用等发版也能用）');
-  assert(acm!.baseUrls['claude-code'] === 'https://api.aicodemirror.com/api/claudecode', `claude-code 端点不对: ${acm!.baseUrls['claude-code']}`);
-  assert(acm!.baseUrls['gemini-cli'] === 'https://api.aicodemirror.com/api/gemini', `gemini-cli 端点不对: ${acm!.baseUrls['gemini-cli']}`);
-  assert(acm!.baseUrls['codex-cli'] === 'https://api.aicodemirror.com/api/codex/backend-api/codex', `codex-cli 端点不对: ${acm!.baseUrls['codex-cli']}`);
+test('AICodeMirror 已下架（2026-09-14）：进 removedProviders，清单里不再有它的中转预设与轮换位', () => {
+  assert((m.removedProviders ?? []).includes('aicodemirror'), 'aicodemirror 应在 removedProviders 里（否则老版本用户那边仍会看到）');
+  assert(!(m.relayPresets ?? []).some((r) => /aicodemirror/i.test(r.name)), '清单里不该还有 AICodeMirror 的中转预设（带着返利链接继续曝光）');
+  assert(!(m.sponsorRotation ?? []).some((e) => /aicodemirror/i.test(e.name)), '赞助商轮换池里不该还有 AICodeMirror');
 });
 
 test('LanoX AI 的中转预设已上架，且端点与内置预设一致（2026-08 新增）', () => {

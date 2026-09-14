@@ -154,7 +154,8 @@ export interface AnthropicProviderSpec {
 }
 
 export const ANTHROPIC_PROVIDERS: AnthropicProviderSpec[] = [
-  // AICodeMirror（赞助商）—— Claude / Codex / Gemini 官方高稳定中转。
+  // AICodeMirror —— Claude / Codex / Gemini 中转（赞助已于 2026-09-14 下架，provider 保留可用，
+  // 不搞坏已配好 key 的用户；Studio 里退到末位的已下架组）。
   // 直连走 Anthropic Messages 协议：base 不带 /v1，客户端自己接 /v1/messages
   // （已探测核实：/api/claudecode 前缀 401=存在，根 /v1/chat/completions 404=没有
   // OpenAI 兼容端点）。同一账号给编码 CLI 配中转见前端 CLI_RELAY_PRESETS。

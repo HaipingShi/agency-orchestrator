@@ -926,10 +926,6 @@ export const COMMON_RELAY_MODELS = [
 export const API_PROVIDERS: ApiProviderMeta[] = [
   // 旗舰赞助商 APINEBULA —— 金色高亮（大屏特有）
   { id: "apinebula", name: "APINEBULA", hint: "apinebula.ai", defaultBaseUrl: "https://apinebula.ai/v1", signupUrl: "https://apinebula.ai/V6ekjG", flagship: true, modelSuggestions: ["gpt-5.5", "claude-opus-4-8", "claude-sonnet-5", "gemini-3.5-flash", "deepseek-chat"] },
-  // 赞助商 AICodeMirror —— 顶替 RootFlowAI 的位置（两个高亮位之后的首位）。
-  // 它走 **Anthropic 原生协议**而非 OpenAI 兼容（引擎侧在 ANTHROPIC_PROVIDERS 注册，
-  // 连接器复用 ClaudeConnector）：base 不带 /v1，客户端自己接 /v1/messages。
-  { id: "aicodemirror", name: "AICodeMirror", hint: "api.aicodemirror.com · Claude/Codex/Gemini 官方中转", defaultBaseUrl: "https://api.aicodemirror.com/api/claudecode", signupUrl: "https://www.aicodemirror.ai/register?invitecode=XO5L7R", sponsor: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"] },
   // 赞助商 Cubence —— API 中转：一个 key 通用多家模型（此为直连 API 用法；
   // 给本地 CLI 配中转的另一用法见 CLI_RELAY_PRESETS，两者共用同一账号）
   { id: "cubence", name: "Cubence", hint: "api.cubence.com", defaultBaseUrl: "https://api.cubence.com/v1", signupUrl: "https://cubence.com/signup?code=SCW29JP9&source=agency", sponsor: true, modelSuggestions: COMMON_RELAY_MODELS },
@@ -1002,6 +998,10 @@ export const API_PROVIDERS: ApiProviderMeta[] = [
   { id: "rootflowai", name: "RootFlowAI", hint: "rootflowai.com", defaultBaseUrl: "https://api.rootflowai.com/v1", delisted: true, modelSuggestions: COMMON_RELAY_MODELS },
   // 统一端点 www.ccsub.net 同时兼容 Anthropic 与 OpenAI（此处直连走 OpenAI 兼容 /v1）
   { id: "ccsub", name: "CCSub", hint: "www.ccsub.net", defaultBaseUrl: "https://www.ccsub.net/v1", delisted: true, modelSuggestions: COMMON_RELAY_MODELS },
+  // AICodeMirror：赞助已于 2026-09-14 下架 —— 摘掉赞助标识、推广链接（返利码）与置顶位，
+  // 编码 CLI 中转预设一并摘除；**保留为可用供应商**排在末位（同多元探索 / RootFlowAI / CCSub）。
+  // 它走 **Anthropic 原生协议**（引擎侧在 ANTHROPIC_PROVIDERS 注册）：base 不带 /v1。
+  { id: "aicodemirror", name: "AICodeMirror", hint: "api.aicodemirror.com", defaultBaseUrl: "https://api.aicodemirror.com/api/claudecode", delisted: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"] },
 ];
 
 export const API_PROVIDER_MAP: Record<string, ApiProviderMeta> = Object.fromEntries(
@@ -1033,7 +1033,7 @@ export interface CliRelayPreset {
   /**
    * 该中转商的 **Anthropic Messages 协议**接入点，用于 AO 直连（provider: claude + base_url），
    * 不是给本地 CLI 用的。填了就会在「Claude (Anthropic)」供应商配置页出现一键填充。
-   * 只列确认过是 Anthropic 协议的（AICodeMirror 的 /api/claudecode 即是；对齐 cc-switch
+   * 只列确认过是 Anthropic 协议的（LanoX 的根地址、胜算云的 /api 即是；对齐 cc-switch
    * 的 opencode/openclaw 预设：@ai-sdk/anthropic、api: "anthropic-messages"）。
    */
   anthropicApiBaseUrl?: string;
@@ -1096,33 +1096,6 @@ export const CLI_RELAY_PRESETS: CliRelayPreset[] = [
     sonnetModel: "doubao-seed-2-1-pro-260628",
     opusModel: "doubao-seed-2-1-pro-260628",
     haikuModel: "doubao-seed-2-1-pro-260628",
-  },
-  // AICodeMirror（赞助商）—— Claude / Codex / Gemini 官方高稳定中转。
-  // 三个端点各不相同，且**都不是**其它中转商那种"根路径 / /v1"布局，抄错必 401：
-  //   Claude Code → /api/claudecode（Anthropic 兼容，CLI 自己接 /v1/messages）
-  //   Gemini CLI  → /api/gemini
-  //   Codex       → /api/codex/backend-api/codex（ChatGPT backend 风格；AO 写 codex
-  //                 config.toml 时 wire_api="responses"，实际请求落到 .../codex/responses，
-  //                 与它宣传的"Codex 官方渠道"一致，不是 OpenAI 兼容的 /v1）
-  // 注意域名：官网/注册页是 aicodemirror.ai，**API 主机是 aicodemirror.com**（.ai 的
-  // api 子域也可达，但以 .com 为准，与官方一键配置脚本一致）。
-  // 已探测核实：/api/claudecode、/api/codex、/api/gemini 三个前缀均返回 401（存在、仅 key 无效），
-  // 而同级不存在的前缀（如 /api/zzz、根 /v1/chat/completions）返回 404 —— 401 不是网关对全站的
-  // 兜底应答，确实代表路径存在。前缀之下的具体子路径被鉴权网关挡住，无法无 key 验证，
-  // 取值以官方一键配置脚本 / 官方接入文档为准。
-  {
-    name: "AICodeMirror",
-    sponsor: true,
-    signupUrl: "https://www.aicodemirror.ai/register?invitecode=XO5L7R",
-    // 直连 API 走 Anthropic Messages 协议（不是 OpenAI 兼容——根 /v1/chat/completions
-    // 实测 404），所以不进 API_PROVIDERS 那张 OpenAI 兼容表，而是配在 provider: claude
-    // 上。SDK 会自己接 /v1/messages，落到 /api/claudecode/v1/messages（实测 401=存在）。
-    anthropicApiBaseUrl: "https://api.aicodemirror.com/api/claudecode",
-    baseUrls: {
-      "claude-code": "https://api.aicodemirror.com/api/claudecode",
-      "gemini-cli": "https://api.aicodemirror.com/api/gemini",
-      "codex-cli": "https://api.aicodemirror.com/api/codex/backend-api/codex",
-    },
   },
   // LanoX AI（赞助商）—— 一个 key 通 GPT / Claude / Gemini / Qwen / Grok 等，官网明列
   // Claude Code、Codex CLI、Cursor、Cline 为支持的客户端。端点布局是常见那种：

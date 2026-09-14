@@ -128,30 +128,41 @@ function providerOrder(): string[] {
   return [...block.slice(0, block.indexOf('\n];')).matchAll(/\{ id: "([\w-]+)"/g)].map((m) => m[1]);
 }
 
-test('Studio 供应商列表：AICodeMirror 紧跟高亮位（多元探索下架后只剩旗舰一个高亮位）', () => {
+// 已下架的赞助商（按下架先后）：退到 Studio 列表末位组、摘掉官网卡片与推广链接，但保留为可用供应商。
+const DELISTED = ['duoyuanx', 'rootflowai', 'ccsub', 'aicodemirror'];
+
+test('Studio 供应商列表：旗舰 APINEBULA 打头', () => {
   const order = providerOrder();
-  const i = order.indexOf('aicodemirror');
-  // 2026-08-17 之前是两个高亮位（进阶档多元探索 + 旗舰 APINEBULA），AICodeMirror 排索引 2；
-  // 多元探索赞助到期下架、退到末位的已下架组后，高亮位只剩旗舰一个 → 它前移到索引 1。
-  assert(i === 1, `应紧跟旗舰高亮位（索引 1），实际索引 ${i}：${order.slice(0, 4).join(' → ')}`);
   assert(order[0] === 'apinebula', `首位应是旗舰赞助商，实际 ${order[0]}`);
 });
 
-test('下架的多元探索退到末位，但仍在注册表里（已配 key 的用户照常能用）', () => {
+test('下架的赞助商退到末位组，但仍在注册表里（已配 key 的用户照常能用）', () => {
   const order = providerOrder();
-  const i = order.indexOf('duoyuanx');
-  assert(i >= 0, 'duoyuanx 不该被整条删掉——已配过 key 的用户还要看得到、改得动');
-  const tail = order.slice(i);
-  // 后面只允许跟同样已下架的（rootflowai / ccsub），不能把在架供应商压到它后面
-  assert(tail.every((id) => ['duoyuanx', 'rootflowai', 'ccsub'].includes(id)),
-    `已下架的应排在末位组，实际其后还有：${tail.slice(1).join(' → ')}`);
+  for (const id of DELISTED) {
+    assert(order.includes(id), `${id} 不该被整条删掉——已配过 key 的用户还要看得到、改得动`);
+  }
+  const tail = order.slice(order.indexOf('duoyuanx'));
+  // 末位组里只允许同样已下架的，不能把在架供应商压到它们后面
+  assert(tail.every((id) => DELISTED.includes(id)), `已下架的应排在末位组，实际其后还有：${tail.join(' → ')}`);
+  assert(tail.length === DELISTED.length, `已下架的应连成末位组，实际末段：${tail.join(' → ')}`);
+  // 下架要摘掉赞助标识与推广链接（返利码），只留 delisted 标记
+  const block = studioSrc.slice(studioSrc.indexOf('export const API_PROVIDERS: ApiProviderMeta[]'));
+  for (const line of block.slice(0, block.indexOf('\n];')).split('\n').filter((l) => DELISTED.some((id) => l.includes(`{ id: "${id}"`)))) {
+    assert(/delisted: true/.test(line) && !/sponsor: true|flagship: true|signupUrl/.test(line), `已下架的条目还带着赞助标识或推广链接：${line.trim()}`);
+  }
 });
 
-test('官网赞助商页：旗舰打头，AICodeMirror 紧随其后；已下架的不再出现', () => {
+test('AICodeMirror 下架：CLI 中转预设与返利链接一并摘除', () => {
+  const presets = studioSrc.slice(studioSrc.indexOf('export const CLI_RELAY_PRESETS'));
+  assert(!/name: "AICodeMirror"/.test(presets), 'CLI_RELAY_PRESETS 里不该还有 AICodeMirror 预设');
+  assert(!/invitecode=XO5L7R/.test(studioSrc) && !/invitecode=XO5L7R/.test(sponsorsSrc), '返利链接 invitecode=XO5L7R 还留在前端代码里');
+});
+
+test('官网赞助商页：旗舰打头；已下架的不再出现', () => {
   const ids = [...sponsorsSrc.matchAll(/^    id: "([\w-]+)"/gm)].map((m) => m[1]);
-  assert(ids[0] === 'apinebula' && ids[1] === 'aicodemirror', `顺序不对：${ids.join(' → ')}`);
+  assert(ids[0] === 'apinebula', `首位应是旗舰赞助商，实际顺序：${ids.join(' → ')}`);
   // 下架就要摘干净：赞助商页是"谁在付钱"的名单，留着等于替已经结束的合作继续曝光
-  for (const gone of ['duoyuanx', 'rootflowai', 'ccsub']) {
+  for (const gone of DELISTED) {
     assert(!ids.includes(gone), `${gone} 赞助已下架，不该还在官网赞助商页：${ids.join(' → ')}`);
   }
 });

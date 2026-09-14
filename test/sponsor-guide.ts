@@ -6,7 +6,7 @@
  * 重点钉两件事：
  *   1. 轮换是确定性、等份的 —— 份额能向赞助商解释；
  *   2. 引导里的示例命令永远指向一个真实存在的 provider —— 纯 CLI 中转商
- *      （relayOnly，如 AICodeMirror）不能被拿去拼 `--provider`。
+ *      （relayOnly，只做编码 CLI 中转、没有可直连 API 的赞助商）不能被拿去拼 `--provider`。
  */
 import { readFileSync } from 'node:fs';
 import { SPONSOR_ROTATION, PREMIUM_SPONSOR, rotatingSponsors, guideProviderId } from '../src/utils/sponsor-guide.js';
