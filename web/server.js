@@ -34,6 +34,7 @@ import { rotatingSponsors, rotateFrom } from '../dist/utils/sponsor-guide.js';
 // 代理诊断与连接器共用同一份口径（curl 能通而 AO 连不上的头号原因）
 import { envProxyHint } from '../dist/connectors/endpoint.js';
 import { queryNewApiUsage } from '../dist/utils/newapi-usage.js';
+import { probeClaudeCliViaRelay } from '../dist/utils/claude-cli-probe.js';
 import { BUDGET_CAPABLE_PROVIDERS } from '../dist/cli/compose.js';
 // 环境里配了代理就接管全局 dispatcher（Node 的 fetch 默认不读 HTTP(S)_PROXY）。
 // 放在最前面:清单拉取、测试连接、获取模型列表都要用它;没配代理时什么都不做。
@@ -2228,6 +2229,7 @@ app.post('/api/test-provider', async (req, res) => {
     let hitUrl = '';   // 实际打到的地址（可能被跳转 / 换过 /v1 拼法）
     let baseUsed = ''; // 本次测试用的 base_url（规整后）
     let drift;         // 与用户填的 base_url 不一致时的说明
+    let cliProbeNote = ''; // claude-code 中转：直连探测被拒后用本机 claude CLI 复测仍失败时的补充说明
     if (provider === 'claude' || provider === 'claude-code' || ANTHROPIC_PROVIDER_MAP[provider]) {
       // 两条链路都走 Anthropic 原生协议（POST {base}/v1/messages），用 OpenAI 格式测会误报失败。
       //
@@ -2266,6 +2268,20 @@ app.post('/api/test-provider', async (req, res) => {
       // 真实客户端自己接 /v1/messages：用户地址里多写的 /v1 或 /messages 这里虽已兼容，
       // 但对直接读这个地址的 claude CLI 会拼错，照实说清楚
       drift = post.drift || (baseHadSuffix ? `${String(rawBase).trim()} → ${base}（客户端会自己接 /v1/messages，地址里不用写）` : undefined);
+      // 有的中转分组只放行官方 Claude Code 客户端（PackyCode 的 cc 分组即是），会把上面这个探测请求
+      // 拒掉（400「非法请求」、403「only accessible via the official Claude CLI」）——key 其实是好的。
+      // claude-code 这条路实际运行就是本机 claude CLI 走中转，那就用它实测一次再下结论。
+      if (provider === 'claude-code' && (r.status === 400 || r.status === 403)) {
+        const cli = await probeClaudeCliViaRelay({ baseUrl: base, token: key, model, timeoutMs: 60_000 });
+        if (cli.ok) {
+          return res.json({
+            ok: true,
+            latencyMs: Date.now() - t0,
+            note: `直连探测被中转拒绝（HTTP ${r.status}），已改用本机 claude CLI 经中转实测：通过 —— 这家中转只放行官方 Claude Code 客户端，实际运行不受影响`,
+          });
+        }
+        if (!cli.notInstalled) cliProbeNote = `\n  已用本机 claude CLI 经中转复测，仍失败：${cli.error}`;
+      }
     } else {
       // 每个 OpenAI 兼容 provider 的默认 base_url/模型都查 api-providers.ts 这张表 ——
       // 之前这里只对 deepseek 特判，其余(含 compshare/apinebula/agnes 等赞助商)会误用
@@ -2320,7 +2336,7 @@ app.post('/api/test-provider', async (req, res) => {
       // 405/404 这类「地址配错」光报状态码用户查不动 —— 带上实际请求地址和排查指引
       // 带上正文：网关的 503 + model_not_found（令牌分组没开该模型）要给"换分组/换模型"的指引，别叫人"稍后重试"
       const hint = hitUrl ? endpointHint(r.status, hitUrl, baseUsed, drift, txt) : '';
-      return res.json({ ok: false, error: `HTTP ${r.status} ${String(msg).slice(0, 300)}${hint}` });
+      return res.json({ ok: false, error: `HTTP ${r.status} ${String(msg).slice(0, 300)}${hint}${cliProbeNote}` });
     }
     // 通过了但地址有漂移：提醒用户把 base_url 改成最终地址（CLI/其它工具没有这层兜底）
     return res.json({ ok: true, latencyMs, ...(drift ? { note: `已连通，但实际请求地址是 ${hitUrl}（${drift}）——建议把 base_url 改成这个最终地址` } : {}) });
