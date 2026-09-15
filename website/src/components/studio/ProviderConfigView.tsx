@@ -1,8 +1,8 @@
-import { ArrowLeft, Check, Download, ExternalLink, Eye, EyeOff, Loader2, Plug, Plus, Star, TriangleAlert, XCircle } from "lucide-react";
+import { ArrowLeft, Check, Download, ExternalLink, Eye, EyeOff, Gauge, Loader2, Plug, Plus, Star, TriangleAlert, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/i18n/LanguageProvider";
-import { api, CLI_RELAY_PRESETS, CUSTOM_PROVIDER_PRESETS, getFavModels, groupModelsByVendor, providerLogo, toggleFavModel, type CliRelayPreset, type ConfigResponse } from "@/lib/studio";
+import { api, API_PROVIDERS, CLI_RELAY_PRESETS, CUSTOM_PROVIDER_PRESETS, getFavModels, groupModelsByVendor, providerLogo, toggleFavModel, type CliRelayPreset, type ConfigResponse } from "@/lib/studio";
 import { sponsors, sponsorUrl } from "@/content/sponsors";
 import { Tip } from "@/components/ui/tip";
 import { track } from "@/lib/track";
@@ -130,6 +130,29 @@ export function ProviderConfigView({
   const avatarChar = (isAdd ? (customName || "+") : displayTitle).slice(0, 1).toUpperCase();
   const logo = !isAdd ? providerLogo(providerId) : undefined;
   useEffect(() => { setFavModels(getFavModels(providerId)); }, [providerId]);
+
+  // 账户用量查询（NewAPI 系网关，如 PackyCode；对照 cc-switch 的 NewAPI 模板）。
+  // 凭据是控制台的系统访问令牌 + 用户 ID，不是上面的 API key；令牌查通后由后端保存、不回显。
+  const usageKind = target.kind === "api" ? API_PROVIDERS.find((x) => x.id === target.id)?.usageQuery : undefined;
+  const [usageToken, setUsageToken] = useState("");
+  const [usageUserId, setUsageUserId] = useState(status?.usageUserId || "");
+  const [usage, setUsage] = useState<{ status: "idle" | "loading" | "ok" | "fail"; msg?: string; data?: { planName?: string; remaining?: number; used?: number; total?: number } }>({ status: "idle" });
+  const fmtUsd = (n?: number) => (typeof n === "number" && Number.isFinite(n) ? `$${n.toFixed(2)}` : "—");
+  const runUsage = async () => {
+    if (offline) { setUsage({ status: "fail", msg: p.demoNeedsEngineShort }); return; }
+    setUsage({ status: "loading" });
+    try {
+      const r = await api.providerUsage({
+        provider: providerId,
+        ...(usageToken.trim() ? { accessToken: usageToken.trim() } : {}),
+        ...(usageUserId.trim() ? { userId: usageUserId.trim() } : {}),
+      });
+      if (r.ok) { setUsage({ status: "ok", data: r }); setUsageToken(""); onSaved(); }
+      else setUsage({ status: "fail", msg: r.error });
+    } catch (e: any) {
+      setUsage({ status: "fail", msg: e?.message || String(e) });
+    }
+  };
   // base_url 输入的 placeholder：内置供应商显示真实默认端点,一眼知道留空会用什么
   const baseUrlPlaceholder =
     target.kind === "api" && target.defaultBaseUrl ? target.defaultBaseUrl
@@ -765,6 +788,54 @@ export function ProviderConfigView({
                   ) : (
                     <div className="mt-1.5 flex max-h-44 flex-wrap gap-1.5 overflow-auto">{pinnedFirst.map(chip)}</div>
                   ))}
+              </div>
+            </Section>
+          )}
+
+          {usageKind && (
+            <Section title={p.usageTitle}>
+              <p className="text-xs leading-relaxed text-muted-foreground">{p.usageHelp}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs">
+                  <span className="text-muted-foreground">{p.usageAccessToken}</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={usageToken}
+                    onChange={(e) => setUsageToken(e.target.value)}
+                    placeholder={status?.hasUsageToken ? p.usageTokenSaved : ""}
+                    className={cn(inputCls, "mt-1.5")}
+                  />
+                </label>
+                <label className="block text-xs">
+                  <span className="text-muted-foreground">{p.usageUserId}</span>
+                  <input
+                    inputMode="numeric"
+                    value={usageUserId}
+                    onChange={(e) => setUsageUserId(e.target.value)}
+                    className={cn(inputCls, "mt-1.5")}
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button size="sm" variant="outline" onClick={runUsage} disabled={usage.status === "loading"}>
+                  {usage.status === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : <Gauge className="size-3.5" />}
+                  {p.usageQueryBtn}
+                </Button>
+                {usage.status === "ok" && usage.data && (
+                  <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                    <span><span className="text-muted-foreground">{p.usageRemaining} </span><span className="font-semibold text-emerald-500">{fmtUsd(usage.data.remaining)}</span></span>
+                    <span><span className="text-muted-foreground">{p.usageUsed} </span>{fmtUsd(usage.data.used)}</span>
+                    <span><span className="text-muted-foreground">{p.usageTotal} </span>{fmtUsd(usage.data.total)}</span>
+                    {usage.data.planName && <span><span className="text-muted-foreground">{p.usagePlan} </span>{usage.data.planName}</span>}
+                  </span>
+                )}
+                {usage.status === "fail" && (
+                  <span className="inline-flex min-w-0 items-start gap-1 text-xs text-red-500">
+                    <XCircle className="mt-0.5 size-3.5 shrink-0" />
+                    <span className="min-w-0 break-words">{usage.msg}</span>
+                  </span>
+                )}
               </div>
             </Section>
           )}

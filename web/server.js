@@ -33,6 +33,7 @@ import { validateCustomProviderId, readCustomProviders, addCustomProvider, remov
 import { rotatingSponsors, rotateFrom } from '../dist/utils/sponsor-guide.js';
 // 代理诊断与连接器共用同一份口径（curl 能通而 AO 连不上的头号原因）
 import { envProxyHint } from '../dist/connectors/endpoint.js';
+import { queryNewApiUsage } from '../dist/utils/newapi-usage.js';
 import { BUDGET_CAPABLE_PROVIDERS } from '../dist/cli/compose.js';
 // 环境里配了代理就接管全局 dispatcher（Node 的 fetch 默认不读 HTTP(S)_PROXY）。
 // 放在最前面:清单拉取、测试连接、获取模型列表都要用它;没配代理时什么都不做。
@@ -1773,6 +1774,14 @@ app.get('/api/config', async (_req, res) => {
       baseUrl: saved[provider]?.baseUrl || (cfg.base ? process.env[cfg.base] : '') || '',
       model: saved[provider]?.model || '',
       supportsBaseUrl: !!cfg.base,
+      // 账户用量查询（NewAPI 系，如 PackyCode）：只回显「令牌已存」与用户 ID，访问令牌本身绝不下发
+      ...(USAGE_QUERY_PROVIDERS[provider]
+        ? {
+            usageQuery: USAGE_QUERY_PROVIDERS[provider],
+            hasUsageToken: !!saved[provider]?.usageAccessToken,
+            usageUserId: saved[provider]?.usageUserId || '',
+          }
+        : {}),
       // 清单 providerOverrides 里的换代模型建议——前端模型下拉在拉不到真实
       // /models 时优先用它兜底（比打包进前端的静态建议新）
       ...(manifest.providerOverrides?.[provider]?.modelSuggestions
@@ -2160,6 +2169,36 @@ app.delete('/api/custom-providers/:id', (req, res) => {
 const keyCharsetError = (key) => (typeof key === 'string' && /[^\x20-\x7E]/.test(key))
   ? 'API key 含中文/全角字符——通常是复制时把旁边的说明文字一起带上了，请只粘贴 key 本身（重新复制或删掉多余字符）'
   : null;
+
+// ── 账户用量查询（NewAPI 系网关，如 PackyCode）───────────────────────────────────
+// 对照 cc-switch 的「用量查询 · NewAPI 模板」：GET {站点根}/api/user/self，凭据是控制台
+// 「个人设置 → 安全设置」生成的**系统访问令牌** + 用户 ID（不是调用模型的 API key）。
+// 令牌与 API key 存在同一个 web-keys 文件里，/api/config 只回显「已存」与用户 ID。
+// 支持的供应商在这里登记，与 Studio 的 ApiProviderMeta.usageQuery 保持一致。
+const USAGE_QUERY_PROVIDERS = { packycode: 'newapi' };
+app.post('/api/provider-usage', async (req, res) => {
+  const { provider, accessToken, userId } = req.body || {};
+  if (!USAGE_QUERY_PROVIDERS[provider]) return res.status(400).json({ ok: false, error: `该供应商暂不支持用量查询：${provider || '(空)'}` });
+  const tokenErr = keyCharsetError(accessToken);
+  if (tokenErr) return res.json({ ok: false, error: tokenErr });
+  const keys = readKeys();
+  const entry = keys[provider] || {};
+  const tokenIn = typeof accessToken === 'string' ? accessToken.trim() : '';
+  const userIdIn = userId === undefined || userId === null ? '' : String(userId).trim();
+  const cfg = KEY_ENV[provider];
+  const baseUrl = entry.baseUrl || (cfg?.base ? process.env[cfg.base] : '') || API_PROVIDER_MAP[provider]?.defaultBaseUrl || '';
+  const r = await queryNewApiUsage({
+    baseUrl,
+    accessToken: tokenIn || entry.usageAccessToken || '',
+    userId: userIdIn || entry.usageUserId || '',
+  });
+  // 查通了才保存新填的凭据：填错的不落盘，免得下次打开还是一份坏配置
+  if (r.ok && (tokenIn || userIdIn)) {
+    keys[provider] = { ...entry, ...(tokenIn ? { usageAccessToken: tokenIn } : {}), ...(userIdIn ? { usageUserId: userIdIn } : {}) };
+    writeKeys(keys);
+  }
+  res.json(r);
+});
 
 app.post('/api/test-provider', async (req, res) => {
   // apiKey/baseUrl/model 可由请求带入覆盖:配置页"填了就能测",不用先保存

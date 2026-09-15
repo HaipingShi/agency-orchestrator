@@ -296,6 +296,10 @@ export interface ProviderKeyStatus {
   sonnetModel?: string;
   opusModel?: string;
   haikuModel?: string;
+  /** 支持账户用量查询时由后端回显：是否已存系统访问令牌（令牌本身不下发）与用户 ID */
+  usageQuery?: "newapi";
+  hasUsageToken?: boolean;
+  usageUserId?: string;
 }
 
 export interface CliProviderStatus {
@@ -690,6 +694,9 @@ export const api = {
   // apiKey/baseUrl/model 可选覆盖:配置页里"填了就能测",不用先保存
   testProvider: (provider: string, overrides?: { apiKey?: string; baseUrl?: string; model?: string }) =>
     postJSON<{ ok: boolean; latencyMs?: number; error?: string; note?: string }>("/test-provider", { provider, ...overrides }),
+  // 账户用量查询（NewAPI 系网关，如 PackyCode）：accessToken/userId 可带入（查通才由后端保存），不带则用已保存的
+  providerUsage: (body: { provider: string; accessToken?: string; userId?: string }) =>
+    postJSON<{ ok: boolean; error?: string; planName?: string; remaining?: number; used?: number; total?: number; unit?: string }>("/provider-usage", body),
   createCustomProvider: (body: { id: string; name: string; note?: string; homepageUrl?: string; baseUrl: string; apiKey?: string; model?: string }) =>
     postJSON<{ ok: boolean }>("/custom-providers", body),
   // 拉取供应商真实可用模型列表（OpenAI 兼容 GET /models）；baseUrl/apiKey 可覆盖（未保存时先试拉）；
@@ -903,6 +910,12 @@ export interface ApiProviderMeta {
    */
   delisted?: boolean;
   modelSuggestions?: string[];
+  /**
+   * 支持账户用量查询（配置页出现「用量查询」卡片）。"newapi" = NewAPI 系网关（PackyCode 等）：
+   * 对照 cc-switch 的 NewAPI 模板，用控制台生成的系统访问令牌 + 用户 ID 查 /api/user/self。
+   * 后端登记在 web/server.js 的 USAGE_QUERY_PROVIDERS，两边要一致。
+   */
+  usageQuery?: "newapi";
 }
 
 // 「一个 key 通 Claude/GPT/Gemini 等多家」的跨家中转，没 key 时的常用模型兜底：
@@ -970,7 +983,7 @@ export const API_PROVIDERS: ApiProviderMeta[] = [
   // Codex 默认 gpt-5.6-sol（价目表在列、支持 openai-response，已加进建议）；它给 Gemini 写的 gemini-3.6-flash
   // **不在** PackyCode 价目表里，没照抄。备用主机 cf.api.fan / slb-v1.api.fan / www.packyapi.com 也逐条探过：
   // /v1/models、chat/completions、messages、responses 均 401「无效的令牌」、乱写路径 404，是同一网关。
-  { id: "packycode", name: "PackyCode", hint: "www.packyapi.ai · 人民币 1:1 充值 · 新用户送 $1 体验额度", defaultBaseUrl: "https://www.packyapi.ai/v1", signupUrl: "https://www.packyapi.ai/register?aff=js5W", sponsor: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-5", "gpt-5.6-sol", "gpt-5.5", "gemini-3.5-flash", "deepseek-v4-pro"], imageModels: ["gpt-image-2"] },
+  { id: "packycode", name: "PackyCode", hint: "www.packyapi.ai · 人民币 1:1 充值 · 新用户送 $1 体验额度", defaultBaseUrl: "https://www.packyapi.ai/v1", signupUrl: "https://www.packyapi.ai/register?aff=js5W", sponsor: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-5", "gpt-5.6-sol", "gpt-5.5", "gemini-3.5-flash", "deepseek-v4-pro"], imageModels: ["gpt-image-2"], usageQuery: "newapi" },
   { id: "deepseek", name: "DeepSeek", hint: "platform.deepseek.com", defaultBaseUrl: "https://api.deepseek.com/v1", vendor: true, modelSuggestions: ["deepseek-chat", "deepseek-reasoner"] },
   // 默认端点**不带 /v1**：Anthropic 客户端（SDK / claude CLI）自己会接 /v1/messages，
   // base 里再写一遍就成了 /v1/v1/messages。这里是用户配中转时照抄的形状样板，写错等于
