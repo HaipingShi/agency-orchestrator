@@ -360,6 +360,11 @@ assert(new OllamaConnector('localhost:11434') instanceof OllamaConnector, 'Ollam
   const h2 = endpointHint(400, 'https://www.packyapi.ai/v1/messages', 'https://www.packyapi.ai', undefined, probe);
   assert(/只放行官方 Claude Code 客户端/.test(h2), '「测试连接」的探测请求被拒（400 请用正确的 Claude Code 客户端）也认得出');
   assert(/401\/403 = 鉴权没过/.test(endpointHint(403, 'https://x/v1/messages', 'https://x', undefined, '{"error":"invalid x-api-key"}')), '普通 403 仍给原来的鉴权提示');
+  // OpenAI 兼容端点的拒绝正文里没有"官方客户端"字样，只有 code: access_denied
+  const denied = '{"error":{"message":"访问被拒绝 (request id: X)","type":"packy_api_error","param":"","code":"access_denied"}}';
+  const h3 = endpointHint(403, 'https://www.packyapi.ai/v1/chat/completions', 'https://www.packyapi.ai/v1', undefined, denied);
+  assert(/access_denied/.test(h3) && /不是 key 复制错了/.test(h3), '403 + access_denied：说清 key 没错、是分组不放行');
+  assert(/claude-code/.test(h3) && /claude-officially/.test(h3) && !/401\/403 = 鉴权没过/.test(h3), 'access_denied 给出 claude-code 中转 / 换 API 分组两条路，不再叫人核对 key');
 }
 
 console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed\n`);

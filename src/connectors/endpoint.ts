@@ -287,6 +287,16 @@ export function isOfficialClaudeClientOnly(text: string): boolean {
   return /only accessible via the official claude (cli|code)|正确的 ?claude code ?客户端/i.test(text);
 }
 
+/**
+ * 网关认得这把 key，但拒绝这种调用：new-api 系回 403 + `code: access_denied`「访问被拒绝」。
+ * PackyCode 的 cc 分组（Claude Code 专用）走 OpenAI 兼容 /v1/chat/completions 时就是这句，
+ * 正文里**没有**"官方客户端"字样（2026-09-15 真 key 实测），所以单独认 access_denied。
+ * 这时让人"核对 key 是否复制完整"是误导——key 没错，是分组不放行。
+ */
+export function isGatewayAccessDenied(text: string): boolean {
+  return /"code"\s*:\s*"access_denied"/i.test(text);
+}
+
 /** 把 HTTP 错误码翻成用户能照做的排查话术（连接器与「测试连接」共用）。body 可选：有正文时能认出"模型不可用"这类伪装成 5xx 的账号问题 */
 export function endpointHint(status: number, url: string, baseUrl: string, drift?: string, body?: string): string {
   const lines = [`请求地址: POST ${url}`];
@@ -295,6 +305,11 @@ export function endpointHint(status: number, url: string, baseUrl: string, drift
     lines.push(
       '只放行官方 Claude Code 客户端：这个 key 所在的分组是 Claude Code 专用的，直连 API 与「测试连接」都会被拒 —— key 本身没问题',
       '要用它：选 claude-code 供应商并配这家的 Claude Code 中转（本机 claude CLI 走中转，实跑正常）；要直连 API：去中转商控制台换一个 API 分组（如 PackyCode 的 claude-officially）',
+    );
+  } else if (body && isGatewayAccessDenied(body)) {
+    lines.push(
+      '访问被拒绝（access_denied）：网关认得这把 key，但它所在的分组不允许这种调用 —— 不是 key 复制错了',
+      '常见于 Claude Code 专用分组（如 PackyCode 的 cc）：配成 Claude Code 中转、供应商选 claude-code 即可使用；要直连 API，去中转商控制台换一个 API 分组（如 claude-officially）',
     );
   } else if (body && isModelUnavailable(body)) {
     lines.push(
