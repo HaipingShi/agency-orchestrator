@@ -2318,7 +2318,8 @@ app.post('/api/test-provider', async (req, res) => {
         msg = j?.error?.message || j?.message || (typeof j?.error === 'string' ? j.error : txt);
       } catch { /* 非 JSON 原样透传 */ }
       // 405/404 这类「地址配错」光报状态码用户查不动 —— 带上实际请求地址和排查指引
-      const hint = hitUrl ? endpointHint(r.status, hitUrl, baseUsed, drift) : '';
+      // 带上正文：网关的 503 + model_not_found（令牌分组没开该模型）要给"换分组/换模型"的指引，别叫人"稍后重试"
+      const hint = hitUrl ? endpointHint(r.status, hitUrl, baseUsed, drift, txt) : '';
       return res.json({ ok: false, error: `HTTP ${r.status} ${String(msg).slice(0, 300)}${hint}` });
     }
     // 通过了但地址有漂移：提醒用户把 base_url 改成最终地址（CLI/其它工具没有这层兜底）

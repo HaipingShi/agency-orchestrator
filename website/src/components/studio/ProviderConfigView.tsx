@@ -221,11 +221,14 @@ export function ProviderConfigView({
     if (offline) return setTest({ status: "fail", msg: p.demoNeedsEngineShort });
     setTest({ status: "testing" });
     try {
-      // 带上当前输入框里的值:填了就能测,不用先保存
+      // 带上当前输入框里的值:填了就能测,不用先保存。
+      // 模型没填时用该供应商自己的第一个建议模型——后端的兜底 gpt-4o-mini 对聚合商常常根本没上架
+      // （PackyCode 实测：测试连接打出去的就是 gpt-4o-mini，报的错跟用户要用的模型毫无关系）
+      const fallbackModel = target.kind === "api" ? target.suggestions?.[0] : undefined;
       const r = await api.testProvider(providerId, {
         apiKey: key.trim() || undefined,
         baseUrl: baseUrl.trim() || undefined,
-        model: model.trim() || undefined,
+        model: model.trim() || fallbackModel || undefined,
       });
       setTest(r.ok ? { status: "ok", msg: r.note || `${r.latencyMs}ms` } : { status: "fail", msg: r.error });
     } catch (e: any) {
