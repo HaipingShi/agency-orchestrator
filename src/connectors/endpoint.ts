@@ -277,11 +277,26 @@ export function isModelUnavailable(text: string): boolean {
   return /model_not_found|无可用渠道|no available channel/i.test(text);
 }
 
+/**
+ * 中转网关明说「只放行官方 Claude Code 客户端」。PackyCode 的 cc 分组（Claude Code 专用）即如此：
+ * 直连 /v1/messages 回 403「only accessible via the official Claude CLI」，按 Claude Code 协议手搓的
+ * 探测请求回 400「请选择使用正确的 Claude Code 客户端」（2026-09-15 真 key 实测）。
+ * key 是好的——本机 claude CLI 走中转照常能跑，只是直连 API / 「测试连接」这类非官方客户端会被拒。
+ */
+export function isOfficialClaudeClientOnly(text: string): boolean {
+  return /only accessible via the official claude (cli|code)|正确的 ?claude code ?客户端/i.test(text);
+}
+
 /** 把 HTTP 错误码翻成用户能照做的排查话术（连接器与「测试连接」共用）。body 可选：有正文时能认出"模型不可用"这类伪装成 5xx 的账号问题 */
 export function endpointHint(status: number, url: string, baseUrl: string, drift?: string, body?: string): string {
   const lines = [`请求地址: POST ${url}`];
   if (drift) lines.push(`发生了跳转/换路径: ${drift} —— 建议把 base_url 直接改成最终地址`);
-  if (body && isModelUnavailable(body)) {
+  if (body && isOfficialClaudeClientOnly(body)) {
+    lines.push(
+      '只放行官方 Claude Code 客户端：这个 key 所在的分组是 Claude Code 专用的，直连 API 与「测试连接」都会被拒 —— key 本身没问题',
+      '要用它：选 claude-code 供应商并配这家的 Claude Code 中转（本机 claude CLI 走中转，实跑正常）；要直连 API：去中转商控制台换一个 API 分组（如 PackyCode 的 claude-officially）',
+    );
+  } else if (body && isModelUnavailable(body)) {
     lines.push(
       '模型不可用：该 key 所在的分组里没有这个模型的可用渠道 —— 这是账号配置问题，不是临时故障，重试无用',
       '去中转商控制台给这个令牌换一个包含该模型的分组，或换成该分组下能用的模型（配好 key 点「获取模型列表」看实际可用的）',

@@ -349,5 +349,18 @@ assert(new OllamaConnector('localhost:11434') instanceof OllamaConnector, 'Ollam
   assert(/5xx = 上游服务异常/.test(endpointHint(502, 'https://x/v1/chat/completions', 'https://x/v1', undefined, '<html>Bad Gateway</html>')), '普通 502 正文不被误认成模型不可用');
 }
 
+// ── 只放行官方 Claude Code 客户端的分组（PackyCode cc 分组真实报文，2026-09-15）──
+{
+  const direct = '{"error":{"type":"packy_api_error","message":"This API endpoint is only accessible via the official Claude CLI (request id: X)"},"type":"packy_error"}';
+  const probe = '{"error":{"message":"您的请求携带的一些参数似乎不正确，……或者选择使用正确的 Claude Code 客户端。"}}';
+  const h1 = endpointHint(403, 'https://www.packyapi.ai/v1/messages', 'https://www.packyapi.ai', undefined, direct);
+  assert(/只放行官方 Claude Code 客户端/.test(h1) && /key 本身没问题/.test(h1), '直连被拒（403 only via official Claude CLI）时说清 key 没问题、是分组限制');
+  assert(/claude-code/.test(h1) && /claude-officially/.test(h1), '给出两条出路：走 claude-code 中转，或换 API 分组');
+  assert(!/401\/403 = 鉴权没过/.test(h1), '别再让人去核对 key 是否复制完整');
+  const h2 = endpointHint(400, 'https://www.packyapi.ai/v1/messages', 'https://www.packyapi.ai', undefined, probe);
+  assert(/只放行官方 Claude Code 客户端/.test(h2), '「测试连接」的探测请求被拒（400 请用正确的 Claude Code 客户端）也认得出');
+  assert(/401\/403 = 鉴权没过/.test(endpointHint(403, 'https://x/v1/messages', 'https://x', undefined, '{"error":"invalid x-api-key"}')), '普通 403 仍给原来的鉴权提示');
+}
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
