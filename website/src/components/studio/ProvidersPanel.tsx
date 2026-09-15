@@ -465,6 +465,9 @@ export function ProvidersPanel({ active, onSetActive, offline = false }: { activ
 
       {editing && (
         <ProviderConfigView
+          // 按目标重建：从 API 卡片「改用 Claude Code 中转」直接切到中转页时，不重建的话输入框状态
+          // 会沿用上一页（base_url 还是 API 卡片那个空值），预填的中转端点就丢了
+          key={`${editing.kind}:${"id" in editing ? editing.id : ""}`}
           target={editing}
           relayPresets={relayPresets}
           status={
@@ -477,6 +480,7 @@ export function ProvidersPanel({ active, onSetActive, offline = false }: { activ
           onClose={() => setEditing(null)}
           onSaved={load}
           offline={offline}
+          onOpenRelay={(cliId, r, key) => setEditing({ kind: "cli-relay", id: cliId, name: PROVIDER_LABELS[cliId] ?? cliId, globalWrite: CLI_RELAY_GLOBAL_WRITE.has(cliId), initialBaseUrl: r.baseUrls[cliId], initialSonnetModel: r.sonnetModel, initialOpusModel: r.opusModel, initialHaikuModel: r.haikuModel, initialKey: key })}
         />
       )}
     </div>

@@ -19,7 +19,8 @@ export type ConfigTarget =
   // initialBaseUrl：从主列表的中转商行进来时预填该中转商的端点
   // initial{Sonnet,Opus,Haiku,}Model：预设自带模型映射时（如声算云那种带前缀命名的中转），
   // 选中转即预填三档 → 对齐 cc-switch「选预设=模型也填好」的零手填体验
-  | { kind: "cli-relay"; id: string; name: string; globalWrite?: boolean; initialBaseUrl?: string; initialSonnetModel?: string; initialOpusModel?: string; initialHaikuModel?: string; initialModel?: string }
+  // initialKey：从 API 卡片「改用 Claude Code 中转」跳过来时，带上用户刚在那边填的 key（仍由用户自己点保存）
+  | { kind: "cli-relay"; id: string; name: string; globalWrite?: boolean; initialBaseUrl?: string; initialSonnetModel?: string; initialOpusModel?: string; initialHaikuModel?: string; initialModel?: string; initialKey?: string }
   | { kind: "ollama" }
   // prefill：从某个供应商「复制为供应商」时带过来的预填值（品牌端点 + 选定模型 + 建议名/标识）
   | { kind: "add-custom"; prefill?: { id?: string; name?: string; baseUrl?: string; model?: string; note?: string } };
@@ -40,6 +41,7 @@ export function ProviderConfigView({
   onClose,
   onSaved,
   offline = false,
+  onOpenRelay,
 }: {
   target: ConfigTarget;
   status?: ConfigResponse["providers"][string];
@@ -47,6 +49,8 @@ export function ProviderConfigView({
   relayPresets?: CliRelayPreset[];
   onClose: () => void;
   onSaved: () => void;
+  /** 打开某个 CLI 的中转配置页（端点按预设预填，可带上当前填的 key）——由父组件切换视图 */
+  onOpenRelay?: (cliId: string, preset: CliRelayPreset, key?: string) => void;
   /**
    * 没有引擎后端（公开演示站就是这样：纯静态托管，`/api/*` 根本不存在）。
    * 这三个动作（测试连接 / 获取模型列表 / 保存）都必须打后端，在这里点下去只会
@@ -65,7 +69,7 @@ export function ProviderConfigView({
   const addPrefill = target.kind === "add-custom" ? target.prefill : undefined;
 
   // 通用字段（中转商行进来时 initialBaseUrl 优先——用户点的就是"用这家"，即使之前存过别家）
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState((isRelay && (target as { initialKey?: string }).initialKey) || "");
   const [baseUrl, setBaseUrl] = useState(
     (isRelay && (target as { initialBaseUrl?: string }).initialBaseUrl) || status?.baseUrl || addPrefill?.baseUrl || (isOllama ? "http://localhost:11434" : ""),
   );
@@ -130,6 +134,22 @@ export function ProviderConfigView({
   const avatarChar = (isAdd ? (customName || "+") : displayTitle).slice(0, 1).toUpperCase();
   const logo = !isAdd ? providerLogo(providerId) : undefined;
   useEffect(() => { setFavModels(getFavModels(providerId)); }, [providerId]);
+
+  // API 卡片的测试连接被「Claude Code 专用」分组拒绝（PackyCode 的 cc 分组即是：access_denied /
+  // 只放行官方 Claude Code 客户端）：同一家（同主机）有 Claude Code 中转预设时，给一键跳转。
+  // 两个入口都叫 PackyCode，用户很容易一直在错的那张卡上测（2026-09-15 实际发生）。
+  const claudeRelayPreset = target.kind === "api"
+    ? relayPresets.find((r) => {
+        const cc = r.baseUrls["claude-code"];
+        if (!cc) return false;
+        try {
+          return new URL(cc).host === new URL(baseUrl.trim() || target.defaultBaseUrl || "").host;
+        } catch {
+          return false;
+        }
+      })
+    : undefined;
+  const showSwitchToRelay = !!(onOpenRelay && claudeRelayPreset && test.status === "fail" && /access_denied|只放行官方 Claude Code 客户端/.test(test.msg || ""));
 
   // 账户用量查询（NewAPI 系网关，如 PackyCode；对照 cc-switch 的 NewAPI 模板）。
   // 凭据是控制台的系统访问令牌 + 用户 ID，不是上面的 API key；令牌查通后由后端保存、不回显。
@@ -878,6 +898,16 @@ export function ProviderConfigView({
               </button>
             )}
           </div>
+          {/* 单独一行放，别挤进操作行——长报错会被压成一条窄竖栏 */}
+          {showSwitchToRelay && claudeRelayPreset && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs">
+              <span className="min-w-0 flex-1">{p.switchToClaudeRelayHint}</span>
+              <Button size="sm" className="shrink-0" onClick={() => onOpenRelay?.("claude-code", claudeRelayPreset, key.trim() || undefined)}>
+                <Plug className="size-3.5" />
+                {p.switchToClaudeRelay}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
