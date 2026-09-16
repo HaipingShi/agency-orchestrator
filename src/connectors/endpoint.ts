@@ -288,6 +288,24 @@ export function isOfficialClaudeClientOnly(text: string): boolean {
 }
 
 /**
+ * 中转网关明说「只放行官方 Codex 客户端」。PackyCode 的 codex 分组即是：/v1/responses 回
+ * 「请使用标准 Codex 客户端请求，请避免任何基于我方 API 二次分发的 API 转接接入」（2026-09-16 真 key 实测）。
+ */
+export function isOfficialCodexClientOnly(text: string): boolean {
+  return /标准\s*codex\s*客户端|standard codex client/i.test(text);
+}
+
+/**
+ * 模型只收 Responses 协议，不收 chat completions：PackyCode 的 codex 分组对 /v1/chat/completions
+ * 回 400 `protocol_not_supported`「模型 X 不支持 chat completions 协议」——分组里**每个**模型都如此
+ * （gpt-5.5 / gpt-5.6-sol / gpt-6-astra 实测一致），所以不是"这个模型没上架"，而是整条协议不通。
+ * AO 的直连打的就是 /v1/chat/completions，这类分组只能走 Codex CLI 中转。
+ */
+export function isChatProtocolUnsupported(text: string): boolean {
+  return /"code"\s*:\s*"protocol_not_supported"|不支持\s*chat completions\s*协议/i.test(text);
+}
+
+/**
  * 网关认得这把 key，但拒绝这种调用：new-api 系回 403 + `code: access_denied`「访问被拒绝」。
  * PackyCode 的 cc 分组（Claude Code 专用）走 OpenAI 兼容 /v1/chat/completions 时就是这句，
  * 正文里**没有**"官方客户端"字样（2026-09-15 真 key 实测），所以单独认 access_denied。
@@ -305,6 +323,16 @@ export function endpointHint(status: number, url: string, baseUrl: string, drift
     lines.push(
       '只放行官方 Claude Code 客户端：这个 key 所在的分组是 Claude Code 专用的，直连 API 与「测试连接」都会被拒 —— key 本身没问题',
       '要用它：选 claude-code 供应商并配这家的 Claude Code 中转（本机 claude CLI 走中转，实跑正常）；要直连 API：去中转商控制台换一个 API 分组（如 PackyCode 的 claude-officially）',
+    );
+  } else if (body && isOfficialCodexClientOnly(body)) {
+    lines.push(
+      '只放行官方 Codex 客户端：这个 key 所在的分组是 Codex 专用的，直连 API 与「测试连接」都会被拒 —— key 本身没问题',
+      '要用它：给 Codex 配这家的中转（供应商选 codex-cli）；要直连 API：去中转商控制台换一个 API 分组（如 PackyCode 的 bailian）',
+    );
+  } else if (body && isChatProtocolUnsupported(body)) {
+    lines.push(
+      '该模型只收 Responses 协议、不收 chat completions —— AO 直连打的是 /v1/chat/completions，所以用不了（同分组的其它模型也一样）',
+      '换一个收 chat completions 的分组/模型（如 PackyCode 的 bailian 分组、qwen3.8-max），或给 Codex 配这家的中转（供应商选 codex-cli）',
     );
   } else if (body && isGatewayAccessDenied(body)) {
     lines.push(

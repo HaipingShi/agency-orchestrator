@@ -367,5 +367,19 @@ assert(new OllamaConnector('localhost:11434') instanceof OllamaConnector, 'Ollam
   assert(/claude-code/.test(h3) && /claude-officially/.test(h3) && !/401\/403 = 鉴权没过/.test(h3), 'access_denied 给出 claude-code 中转 / 换 API 分组两条路，不再叫人核对 key');
 }
 
+// ── Codex 专用分组（PackyCode codex 分组真实报文，2026-09-16）──
+{
+  const protoErr = '{"error":{"code":"protocol_not_supported","message":"模型 gpt-5.6-sol 不支持 chat completions 协议 (request id: X)","type":"packy_api_error"}}';
+  const h4 = endpointHint(400, 'https://www.packyapi.ai/v1/chat/completions', 'https://www.packyapi.ai/v1', undefined, protoErr);
+  assert(/只收 Responses 协议/.test(h4) && /chat completions/.test(h4), 'protocol_not_supported：说清直连打的 chat completions 这类模型不收');
+  assert(/bailian|qwen3\.8-max/.test(h4) && /codex-cli/.test(h4), '给出换分组/换模型与 Codex 中转两条路');
+  const clientErr = '{"error":{"message":"我们检测到您的客户端存在异常，请使用标准 Codex 客户端请求，请避免任何基于我方 API 二次分发的 API 转接接入。"}}';
+  const h5 = endpointHint(400, 'https://www.packyapi.ai/v1/responses', 'https://www.packyapi.ai/v1', undefined, clientErr);
+  assert(/只放行官方 Codex 客户端/.test(h5) && /key 本身没问题/.test(h5), '「请使用标准 Codex 客户端」：说清是分组限制、key 没问题');
+  assert(/codex-cli/.test(h5), '指到 Codex 中转这条真正能用的路');
+  // 两类 Claude 的提示不能被 Codex 的规则抢走
+  assert(/只放行官方 Claude Code 客户端/.test(endpointHint(403, 'https://x/v1/messages', 'https://x', undefined, '{"error":{"message":"This API endpoint is only accessible via the official Claude CLI"}}')), 'Claude 的判定不受影响');
+}
+
 console.log(`\n${failed === 0 ? '✅' : '❌'} ${passed} passed, ${failed} failed\n`);
 process.exit(failed === 0 ? 0 : 1);
