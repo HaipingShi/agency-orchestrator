@@ -367,6 +367,19 @@ assert(new OllamaConnector('localhost:11434') instanceof OllamaConnector, 'Ollam
   assert(/claude-code/.test(h3) && /claude-officially/.test(h3) && !/401\/403 = 鉴权没过/.test(h3), 'access_denied 给出 claude-code 中转 / 换 API 分组两条路，不再叫人核对 key');
 }
 
+// ── 余额不足：403 但与鉴权无关（PackyCode 真实报文，2026-09-16 撞上）──
+{
+  const body = '{"error":{"message":"用户额度不足, 剩余额度: ＄-0.022462 (request id: X)","type":"packy_api_error","code":"insufficient_user_quota"}}';
+  const h = endpointHint(403, 'https://www.packyapi.ai/v1/chat/completions', 'https://www.packyapi.ai/v1', undefined, body);
+  assert(/账户额度不足/.test(h) && /充值/.test(h), '余额不足时直说去充值');
+  assert(!/401\/403 = 鉴权没过/.test(h) && !/复制完整/.test(h), '不再让人去核对 key（key 没问题）');
+  assert(/别在这儿反复重试/.test(h), '点破换模型/换端点也没用');
+  // 英文网关的写法同样认得
+  assert(/账户额度不足/.test(endpointHint(402, 'https://x/v1/chat/completions', 'https://x/v1', undefined, '{"error":{"code":"insufficient_quota","message":"You exceeded your current quota"}}')), '英文 insufficient_quota 也认');
+  // 真正的鉴权失败不能被这条抢走
+  assert(/401\/403 = 鉴权没过/.test(endpointHint(401, 'https://x/v1/chat/completions', 'https://x/v1', undefined, '{"error":{"message":"invalid api key"}}')), '普通 401 仍给鉴权提示');
+}
+
 // ── Codex 专用分组（PackyCode codex 分组真实报文，2026-09-16）──
 {
   const protoErr = '{"error":{"code":"protocol_not_supported","message":"模型 gpt-5.6-sol 不支持 chat completions 协议 (request id: X)","type":"packy_api_error"}}';

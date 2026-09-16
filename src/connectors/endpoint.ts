@@ -306,6 +306,15 @@ export function isChatProtocolUnsupported(text: string): boolean {
 }
 
 /**
+ * 余额/额度不足：new-api 系回 403「用户额度不足, 剩余额度: ＄-0.02」这类正文（2026-09-16 真机撞上）。
+ * 状态码是 403，会掉进「鉴权没过、核对 key」那条通用提示里 —— key 和地址都没问题，是账户没钱了，
+ * 让人去查 key 只会白费时间。也认 402 系网关常见的英文写法。
+ */
+export function isInsufficientBalance(text: string): boolean {
+  return /额度不足|余额不足|欠费|insufficient[_ ](quota|balance|credit|funds)|insufficient quota/i.test(text);
+}
+
+/**
  * 网关认得这把 key，但拒绝这种调用：new-api 系回 403 + `code: access_denied`「访问被拒绝」。
  * PackyCode 的 cc 分组（Claude Code 专用）走 OpenAI 兼容 /v1/chat/completions 时就是这句，
  * 正文里**没有**"官方客户端"字样（2026-09-15 真 key 实测），所以单独认 access_denied。
@@ -319,7 +328,12 @@ export function isGatewayAccessDenied(text: string): boolean {
 export function endpointHint(status: number, url: string, baseUrl: string, drift?: string, body?: string): string {
   const lines = [`请求地址: POST ${url}`];
   if (drift) lines.push(`发生了跳转/换路径: ${drift} —— 建议把 base_url 直接改成最终地址`);
-  if (body && isOfficialClaudeClientOnly(body)) {
+  if (body && isInsufficientBalance(body)) {
+    lines.push(
+      '账户额度不足：网关已经明说余额不够（有的家会显示成负数）—— key 和地址都没问题，去中转商控制台充值即可',
+      '别在这儿反复重试：余额不补上，换模型、换端点都一样过不去',
+    );
+  } else if (body && isOfficialClaudeClientOnly(body)) {
     lines.push(
       '只放行官方 Claude Code 客户端：这个 key 所在的分组是 Claude Code 专用的，直连 API 与「测试连接」都会被拒 —— key 本身没问题',
       '要用它：选 claude-code 供应商并配这家的 Claude Code 中转（本机 claude CLI 走中转，实跑正常）；要直连 API：去中转商控制台换一个 API 分组（如 PackyCode 的 claude-officially）',
