@@ -62,7 +62,9 @@ export function probeClaudeCliViaRelay(opts: {
       return;
     }
     timer = setTimeout(() => {
+      // 先礼后兵，与 cli-base 同一口径：SIGTERM 不走就 SIGKILL，别把子进程留在那儿
       try { child?.kill('SIGTERM'); } catch { /* 已退出 */ }
+      setTimeout(() => { try { child?.kill('SIGKILL'); } catch { /* 已退出 */ } }, 5000).unref?.();
       done({ ok: false, error: `claude CLI 实测超时（${Math.round(timeoutMs / 1000)}s）` });
     }, timeoutMs);
     child.stdout?.on('data', (d) => { out += d; });
