@@ -39,11 +39,13 @@ export interface SponsorGuideEntry {
  */
 export const PREMIUM_SPONSOR: SponsorGuideEntry | null = null;
 
-/** 引导横幅轮换池：旗舰 + 标准共 6 家（顺序无偏好，轮值即公平；每家 2/6 天数）。
+/** 引导横幅轮换池：旗舰 + 标准共 7 家（顺序无偏好，轮值即公平；每家 2/7 天数）。
  *  RootFlowAI 与 CCSub 已下架赞助（2026-08），AICodeMirror 曾顶上其中一位；
  *  LanoX AI 于 2026-08 新增（池子 5 → 6 家，份额同步从 2/5 稀释为 2/6）；
  *  胜算云于 2026-08 新增（6 → 7 家，份额再稀释为 2/7）；
- *  AICodeMirror 于 2026-09-14 下架（7 → 6 家，份额回到 2/6）。 */
+ *  AICodeMirror 于 2026-09-14 下架（7 → 6 家，份额回到 2/6）；
+ *  PackyCode 于 2026-09-16 补进池（6 → 7 家，份额再稀释为 2/7）——它是标准档赞助商，
+ *  其余标准档都在池里，单把它排除等于收了赞助却不给横幅曝光。 */
 export const SPONSOR_ROTATION: SponsorGuideEntry[] = [
   { providerId: 'apinebula', name: 'APINEBULA', bonus: '充值码 agent 九折', url: 'https://apinebula.ai/V6ekjG' },
   { providerId: 'cubence', name: 'Cubence', bonus: '首购 9 折', url: 'https://cubence.com/signup?code=SCW29JP9&source=agency' },
@@ -51,6 +53,7 @@ export const SPONSOR_ROTATION: SponsorGuideEntry[] = [
   { providerId: 'volcengine', name: '火山引擎', bonus: '注册领 2500 万 Tokens', url: 'https://www.volcengine.com/activity/ai618?utm_campaign=hw&utm_content=hw&utm_medium=devrel_tool_web&utm_source=OWO&utm_term=agency-agents-zh' },
   { providerId: 'lanox', name: 'LanoX AI', bonus: '注册送 5 美金', url: 'https://lanox.ai/?c=X3RD38F7&inviteCode=A3HRUB6M' },
   { providerId: 'shengsuanyun', name: '胜算云', bonus: '注册送 5 元 Token', url: 'https://www.shengsuanyun.com/?from=CH_QKH696UI' },
+  { providerId: 'packycode', name: 'PackyCode', bonus: '新用户首充折扣 + $1 体验额度', url: 'https://www.packyapi.ai/register?aff=js5W' },
 ];
 
 /**
