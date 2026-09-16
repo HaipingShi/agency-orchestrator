@@ -979,11 +979,15 @@ export const API_PROVIDERS: ApiProviderMeta[] = [
   // modelSuggestions / imageModels 取自它公开的 GET /api/pricing（无需 key，2026-09-14 实拉），
   // 五个文本模型的 supported_endpoint_types 都含 openai；gpt-image-2 在 image 分组、端点类型 image-generation。
   // 模型按分组开放，用户令牌不在对应分组就用不了——所以只做下拉建议，不设默认模型。
+  // 建议模型把**直连能用的**排前面（2026-09-16 三把真 key 实测）：bailian 分组（0.5x，最便宜）的
+  // qwen/glm/kimi 直连即通；Claude 系直连要 claude-officially 分组（cc 分组只放行官方 Claude Code
+  // 客户端）；GPT 系直连要 azure-officially（codex 分组连 chat completions 协议都不收）。
+  // 把 claude-sonnet-5 / gpt-5.6-sol 排在最前会直接把人引进坑——用户实际踩过两次。
   // 对照 cc-switch（2026-09-14 拉取）：它所有工具的 PackyCode 主机同为 www.packyapi.ai（Codex/OpenCode 带 /v1），
   // Codex 默认 gpt-5.6-sol（价目表在列、支持 openai-response，已加进建议）；它给 Gemini 写的 gemini-3.6-flash
   // **不在** PackyCode 价目表里，没照抄。备用主机 cf.api.fan / slb-v1.api.fan / www.packyapi.com 也逐条探过：
   // /v1/models、chat/completions、messages、responses 均 401「无效的令牌」、乱写路径 404，是同一网关。
-  { id: "packycode", name: "PackyCode", hint: "www.packyapi.ai · 人民币 1:1 充值 · 新用户送 $1 体验额度", defaultBaseUrl: "https://www.packyapi.ai/v1", signupUrl: "https://www.packyapi.ai/register?aff=js5W", sponsor: true, modelSuggestions: ["claude-sonnet-5", "claude-opus-5", "gpt-5.6-sol", "gpt-5.5", "gemini-3.5-flash", "deepseek-v4-pro"], imageModels: ["gpt-image-2"], usageQuery: "newapi" },
+  { id: "packycode", name: "PackyCode", hint: "www.packyapi.ai · 人民币 1:1 充值 · 新用户送 $1 体验额度", defaultBaseUrl: "https://www.packyapi.ai/v1", signupUrl: "https://www.packyapi.ai/register?aff=js5W", sponsor: true, modelSuggestions: ["qwen3.8-max", "glm-5", "kimi-k2.5", "claude-sonnet-5", "claude-opus-5", "gpt-5.6-sol"], imageModels: ["gpt-image-2"], usageQuery: "newapi" },
   { id: "deepseek", name: "DeepSeek", hint: "platform.deepseek.com", defaultBaseUrl: "https://api.deepseek.com/v1", vendor: true, modelSuggestions: ["deepseek-chat", "deepseek-reasoner"] },
   // 默认端点**不带 /v1**：Anthropic 客户端（SDK / claude CLI）自己会接 /v1/messages，
   // base 里再写一遍就成了 /v1/v1/messages。这里是用户配中转时照抄的形状样板，写错等于
