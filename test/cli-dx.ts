@@ -6,7 +6,7 @@
  *     发布在安装目录，必须回退过去找；找不到 / 给了目录要说人话，不是 ENOENT / EISDIR。
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, chmodSync, rmSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -17,8 +17,9 @@ function assert(c: boolean, m: string): void {
 }
 const cwd = mkdtempSync(join(tmpdir(), 'ao-cli-dx-'));
 const CLI = resolve('dist/cli.js');
-const ao = (...a: string[]) => {
-  const r = spawnSync(process.execPath, [CLI, ...a], { cwd, encoding: 'utf-8', timeout: 60_000, env: { ...process.env, AO_NO_UPDATE_CHECK: '1' }, input: '' });
+const ao = (...a: string[]) => aoEnv({}, ...a);
+const aoEnv = (extra: NodeJS.ProcessEnv, ...a: string[]) => {
+  const r = spawnSync(process.execPath, [CLI, ...a], { cwd, encoding: 'utf-8', timeout: 60_000, env: { ...process.env, AO_NO_UPDATE_CHECK: '1', ...extra }, input: '' });
   return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
 };
 
@@ -67,6 +68,45 @@ console.log('\n─── validate --fix：把 depends_on 写成上游输出变�
   assert(again.code === 0 && !/已改写/.test(again.out), '幂等：再跑一次没有可改的');
   const body = readFileSync(wf, 'utf-8');
   assert(/depends_on: \[analyze\]/.test(body) && /\{\{analysis_result\}\}/.test(body), '只动 depends_on 那一处，task 里同名的 {{变量}} 引用不碰');
+}
+
+console.log('\n─── 纯本地的子命令不去挑 provider ───');
+{
+  // `ao prompt list/garden` 只读本地文件，却也跑 autoProvider，于是顶上多一句
+  // 「检测到本机已安装 claude-code，零配置直接用」——这条命令根本不调模型，管道里还多一行。
+  // 自造一个假的 claude 可执行文件塞进 PATH：否则这条测试在没装 CLI 的机器（CI）上恒真。
+  const fakeBin = join(cwd, 'fakebin');
+  mkdirSync(fakeBin, { recursive: true });
+  const fake = join(fakeBin, 'claude');
+  writeFileSync(fake, '#!/bin/sh\nexit 0\n', 'utf-8');
+  chmodSync(fake, 0o755);
+  const env = { PATH: fakeBin, AO_PROMPTS_DIR: join(cwd, 'prompts') };
+
+  const list = aoEnv(env, 'prompt', 'list');
+  assert(list.code === 0 && !/零配置直接用/.test(list.out), `prompt list 不再报 provider（实际：${list.out.split('\n').find((l) => l.trim())?.slice(0, 70)}）`);
+  const garden = aoEnv(env, 'prompt', 'garden');
+  assert(garden.code === 0 && !/零配置直接用/.test(garden.out) && /Prompt Garden/.test(garden.out), 'prompt garden 同样安静，内容照出');
+  // 真要调模型的那两个照旧选 provider（缺参数时先报探测结果再报用法，说明这步还在）
+  const test = aoEnv(env, 'prompt', 'test');
+  assert(/用法: ao prompt test/.test(test.out), 'prompt test 仍走原路径');
+  assert(process.platform === 'win32' || /零配置直接用/.test(test.out), `prompt test 仍会挑 provider（实际：${test.out.split('\n').find((l) => l.trim())?.slice(0, 70)}）`);
+}
+
+console.log('\n─── 命令打错时的三种指路 ───');
+{
+  // ① 整条命令被当成一个参数：包装脚本 / 多包了一层引号。以前按 slice 拼建议，吐出 `ao validate  x.yaml`
+  //    （双空格），照抄过去还是错的。
+  const quoted = ao('validate workflows/tech-blog.yaml');
+  assert(quoted.code === 1 && /引号包多了/.test(quoted.out), `点破是引号问题（实际：${quoted.out.split('\n')[0]?.slice(0, 70)}）`);
+  assert(/ao validate workflows\/tech-blog\.yaml/.test(quoted.out) && !/ao validate {2}/.test(quoted.out), '建议里只有一个空格，能照抄');
+  // ② 真·少空格
+  const glued = ao('planworkflows/x.yaml');
+  assert(glued.code === 1 && /少了个空格/.test(glued.out) && /ao plan workflows\/x\.yaml/.test(glued.out), '粘在一起的照旧提示补空格');
+  // ③ 打错一两个字母：先点名最接近的命令，再给帮助（以前只有一整页帮助，得自己找）
+  const typo = ao('valdiate');
+  assert(typo.code === 1 && /你是不是想写 "ao validate"/.test(typo.out), `拼错点名最接近的（实际：${typo.out.split('\n')[0]?.slice(0, 70)}）`);
+  const nonsense = ao('zzzzzzzz');
+  assert(nonsense.code === 1 && /未知命令/.test(nonsense.out) && !/你是不是想写/.test(nonsense.out), '八竿子打不着就别瞎猜');
 }
 
 rmSync(cwd, { recursive: true, force: true });
